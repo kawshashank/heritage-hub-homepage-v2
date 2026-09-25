@@ -207,13 +207,25 @@ export default function HomePage() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Auto-advance slider
+// Auto-advance slider
   useEffect(() => {
     const timer = setInterval(() => {
       setActiveSlide((prev) => (prev + 1) % slides.length);
     }, 8000);
     return () => clearInterval(timer);
   }, []);
+
+  // Lock body scroll when modal or mobile menu is open
+  useEffect(() => {
+    if (modal || mobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [modal, mobileMenuOpen]);
 
   const filteredTools = allTools.filter(tool => 
     tool.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -307,7 +319,7 @@ export default function HomePage() {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="fixed inset-0 z-[100] bg-stone-900/95 backdrop-blur-xl flex flex-col p-6"
+            className="fixed inset-0 z-[100] bg-stone-900/95 backdrop-blur-xl flex flex-col p-6 overflow-y-auto overscroll-contain"
           >
             <div className="flex justify-between items-center mb-8">
               <div className="flex items-center gap-2">
