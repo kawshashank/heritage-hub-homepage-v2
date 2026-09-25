@@ -367,7 +367,7 @@ export default function HomePage() {
       </AnimatePresence>
 
       {/* Hero Section */}
-      <div className="relative h-[85vh] min-h-[550px] md:min-h-[600px] w-full overflow-hidden flex flex-col justify-end pb-32 md:pb-40 mt-[52px] md:mt-0">
+      <div className="relative h-[85vh] min-h-[550px] md:min-h-[600px] w-full overflow-hidden flex flex-col justify-end pb-32 md:pb-40 mt-[52px] lg:mt-0">
         
         {/* Mobile Scrolling Navbar (Attached exactly to the top of Hero, inside Hero container) */}
         <div className="lg:hidden absolute top-0 inset-x-0 z-[50] flex items-center justify-between px-6 py-4 w-full text-white bg-gradient-to-b from-black/80 via-black/40 to-transparent">
