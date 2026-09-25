@@ -224,7 +224,7 @@ export default function HomePage() {
     <div className="min-h-screen bg-[#FDFBF7] text-stone-800 font-sans selection:bg-amber-200 overflow-x-hidden">
       
       {/* Mobile Top Counter Banner (Fixed at absolute top for small screens) */}
-      <div className="md:hidden fixed top-0 inset-x-0 z-[70] h-[52px] bg-black text-white px-4 flex flex-col justify-center items-center text-[10px] tracking-widest font-bold border-b border-white/10 shadow-lg">
+      <div className="lg:hidden fixed top-0 inset-x-0 z-[70] h-[52px] bg-black text-white px-4 flex flex-col justify-center items-center text-[10px] tracking-widest font-bold border-b border-white/10 shadow-lg">
         <span className="text-white/60 uppercase mb-0.5">Uprooted, Unheard, yet Unbroken</span>
         <div className="flex gap-2 text-amber-400">
           <span>{counter.years} Years</span>
@@ -234,9 +234,9 @@ export default function HomePage() {
       </div>
 
       {/* Desktop Sticky Navbar (Apple Frosted Glass Effect on Scroll) */}
-      <header className={`hidden md:block fixed top-0 inset-x-0 z-[60] transition-all duration-500 ease-in-out ${scrolled ? 'bg-black/30 backdrop-blur-2xl border-b border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.1)]' : 'bg-gradient-to-b from-black/90 via-black/40 to-transparent border-b border-transparent'}`}>
+      <header className={`hidden lg:block fixed top-0 inset-x-0 z-[60] transition-all duration-500 ease-in-out ${scrolled ? 'bg-black/30 backdrop-blur-2xl border-b border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.1)]' : 'bg-gradient-to-b from-black/90 via-black/40 to-transparent border-b border-transparent'}`}>
         <nav className="flex items-center justify-between px-6 py-4 w-full text-white">
-          <div className="flex items-center gap-8 w-full md:w-auto justify-between md:justify-start">
+          <div className="flex items-center gap-8 w-full lg:w-auto justify-between lg:justify-start">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center border border-amber-400/30">
                 <span className="text-amber-400 font-serif font-bold text-lg leading-none">ॐ</span>
@@ -245,7 +245,7 @@ export default function HomePage() {
             </div>
 
             {/* Desktop Links */}
-            <div className="hidden md:flex items-center gap-6 text-sm font-medium text-white/90">
+            <div className="hidden lg:flex items-center gap-6 text-sm font-medium text-white/90">
               <button onClick={() => window.scrollTo({top:0, behavior:'smooth'})} className="hover:text-amber-300 transition-colors">Home</button>
               <button onClick={() => window.scrollTo({top:800, behavior:'smooth'})} className="hover:text-amber-300 transition-colors">Our tools</button>
               <button onClick={() => setModal('about')} className="hover:text-amber-300 transition-colors">About</button>
@@ -254,7 +254,7 @@ export default function HomePage() {
           </div>
 
           {/* Desktop Search & Counter */}
-          <div className="hidden md:flex items-center gap-6">
+          <div className="hidden lg:flex items-center gap-6">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/60" />
               <input 
@@ -370,7 +370,7 @@ export default function HomePage() {
       <div className="relative h-[85vh] min-h-[550px] md:min-h-[600px] w-full overflow-hidden flex flex-col justify-end pb-32 md:pb-40 mt-[52px] md:mt-0">
         
         {/* Mobile Scrolling Navbar (Attached exactly to the top of Hero, inside Hero container) */}
-        <div className="md:hidden absolute top-0 inset-x-0 z-[50] flex items-center justify-between px-6 py-4 w-full text-white bg-gradient-to-b from-black/80 via-black/40 to-transparent">
+        <div className="lg:hidden absolute top-0 inset-x-0 z-[50] flex items-center justify-between px-6 py-4 w-full text-white bg-gradient-to-b from-black/80 via-black/40 to-transparent">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center border border-amber-400/30">
               <span className="text-amber-400 font-serif font-bold text-lg leading-none">ॐ</span>
@@ -528,7 +528,7 @@ export default function HomePage() {
       </div>
 
       {/* Bottom Content Grid */}
-      <div className="max-w-7xl mx-auto px-6 md:px-16 py-12 md:py-16 grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="max-w-7xl mx-auto px-6 md:px-16 py-12 md:py-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         
         {/* Upcoming Festivals */}
         <div className="col-span-1 space-y-4 md:space-y-5">
@@ -599,7 +599,7 @@ export default function HomePage() {
         </div>
 
         {/* Quote Banner */}
-        <div className="col-span-1 flex flex-col justify-end mt-4 md:mt-0">
+        <div className="col-span-1 md:col-span-2 lg:col-span-1 flex flex-col justify-end mt-4 md:mt-0">
           <div className="bg-amber-50 rounded-3xl p-8 border border-amber-200 flex flex-col justify-center h-full relative overflow-hidden shadow-sm hover:shadow-md transition-shadow group">
             <Quote className="absolute -top-4 -right-4 w-32 h-32 text-amber-200/40 transform -rotate-12 pointer-events-none group-hover:-rotate-6 transition-transform duration-500" />
             <h3 className="font-serif font-bold text-xl sm:text-2xl text-amber-900 leading-snug relative z-10">
