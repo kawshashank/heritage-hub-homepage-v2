@@ -236,16 +236,16 @@ export default function HomePage() {
       {/* Desktop Sticky Navbar (Apple Frosted Glass Effect on Scroll) */}
       <header className={`hidden lg:block fixed top-0 inset-x-0 z-[60] transition-all duration-500 ease-in-out ${scrolled ? 'bg-black/30 backdrop-blur-2xl border-b border-white/10 shadow-[0_4px_30px_rgba(0,0,0,0.1)]' : 'bg-gradient-to-b from-black/90 via-black/40 to-transparent border-b border-transparent'}`}>
         <nav className="flex items-center justify-between px-6 py-4 w-full text-white">
-          <div className="flex items-center gap-8 w-full lg:w-auto justify-between lg:justify-start">
+          <div className="flex items-center gap-4 xl:gap-8 w-full lg:w-auto justify-between lg:justify-start flex-shrink-0">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center border border-amber-400/30">
                 <span className="text-amber-400 font-serif font-bold text-lg leading-none">ॐ</span>
               </div>
-              <span className="font-serif font-semibold text-lg tracking-wide">Kashmiri Heritage Hub</span>
+              <span className="font-serif font-semibold text-base xl:text-lg tracking-wide whitespace-nowrap">Kashmiri Heritage Hub</span>
             </div>
 
             {/* Desktop Links */}
-            <div className="hidden lg:flex items-center gap-6 text-sm font-medium text-white/90">
+            <div className="hidden lg:flex items-center gap-3 xl:gap-6 text-sm font-medium text-white/90">
               <button onClick={() => window.scrollTo({top:0, behavior:'smooth'})} className="hover:text-amber-300 transition-colors">Home</button>
               <button onClick={() => window.scrollTo({top:800, behavior:'smooth'})} className="hover:text-amber-300 transition-colors">Our tools</button>
               <button onClick={() => setModal('about')} className="hover:text-amber-300 transition-colors">About</button>
@@ -254,7 +254,7 @@ export default function HomePage() {
           </div>
 
           {/* Desktop Search & Counter */}
-          <div className="hidden lg:flex items-center gap-6">
+          <div className="hidden lg:flex items-center gap-3 xl:gap-6">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/60" />
               <input 
@@ -262,7 +262,7 @@ export default function HomePage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Find a tool..." 
-                className={`w-64 border rounded-full py-2 pl-9 pr-4 text-sm text-white placeholder:text-white/70 focus:outline-none transition-all ${scrolled ? 'bg-white/5 border-white/20 focus:border-amber-400/50 focus:bg-white/10' : 'bg-black/20 border-white/20 focus:border-amber-400/50 focus:bg-black/40 backdrop-blur-md'}`}
+                className={`w-40 lg:w-48 xl:w-64 border rounded-full py-2 pl-9 pr-4 text-sm text-white placeholder:text-white/70 focus:outline-none transition-all ${scrolled ? 'bg-white/5 border-white/20 focus:border-amber-400/50 focus:bg-white/10' : 'bg-black/20 border-white/20 focus:border-amber-400/50 focus:bg-black/40 backdrop-blur-md'}`}
               />
               <AnimatePresence>
                 {searchQuery.trim().length > 0 && (
@@ -294,7 +294,7 @@ export default function HomePage() {
                 <span className="text-lg ml-1">{counter.months}</span> <span className="text-[10px]">MONTHS</span>
                 <span className="text-lg ml-1">{counter.days}</span> <span className="text-[10px]">DAYS</span>
               </div>
-              <span className="text-[9px] tracking-[0.2em] font-semibold text-white/70 uppercase">Uprooted, Unheard, yet Unbroken</span>
+              <span className="hidden xl:block text-[9px] tracking-[0.2em] font-semibold text-white/70 uppercase">Uprooted, Unheard, yet Unbroken</span>
             </div>
           </div>
         </nav>
@@ -375,7 +375,7 @@ export default function HomePage() {
             <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center border border-amber-400/30">
               <span className="text-amber-400 font-serif font-bold text-lg leading-none">ॐ</span>
             </div>
-            <span className="font-serif font-semibold text-lg tracking-wide">Kashmiri Heritage Hub</span>
+            <span className="font-serif font-semibold text-base xl:text-lg tracking-wide whitespace-nowrap">Kashmiri Heritage Hub</span>
           </div>
           <button 
             className="text-white hover:text-amber-400 transition-colors"
@@ -616,18 +616,19 @@ export default function HomePage() {
       {/* Modals */}
       <AnimatePresence>
         {modal && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => setModal(null)}
-              className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm"
-            />
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className={`relative w-full ${modal === 'suggest' ? 'max-w-lg' : 'max-w-md'} bg-white rounded-[2rem] p-6 sm:p-8 shadow-2xl border border-stone-100 overflow-hidden text-center z-10 max-h-[90vh] overflow-y-auto hide-scrollbar`}
-            >
+          <div className="fixed inset-0 z-[100] overflow-y-auto overscroll-contain">
+            <div className="min-h-full flex items-center justify-center p-4 sm:p-6 text-center">
+              <motion.div 
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                onClick={() => setModal(null)}
+                className="fixed inset-0 bg-stone-900/60 backdrop-blur-sm transition-opacity"
+              />
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                className={`relative w-full ${modal === 'suggest' ? 'max-w-lg' : 'max-w-md'} bg-white rounded-[2rem] p-6 sm:p-8 shadow-2xl border border-stone-100 overflow-hidden text-center z-10 my-4`}
+              >
               <button onClick={() => setModal(null)} className="absolute top-4 sm:top-6 right-4 sm:right-6 text-stone-400 hover:text-stone-800 transition-colors bg-stone-100/50 p-2 rounded-full z-20">
                 <X className="w-5 h-5" />
               </button>
@@ -776,6 +777,7 @@ export default function HomePage() {
               )}
 
             </motion.div>
+            </div>
           </div>
         )}
       </AnimatePresence>
@@ -787,16 +789,18 @@ export default function HomePage() {
       {/* Festival Detail Modal */}
       <AnimatePresence>
         {modal === 'festival' && selectedFestival && (
-          <motion.div 
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center px-4 bg-black/60 backdrop-blur-sm"
-            onClick={() => setModal(null)}
-          >
-            <motion.div 
-              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl relative"
-              onClick={e => e.stopPropagation()}
-            >
+          <div className="fixed inset-0 z-[100] overflow-y-auto overscroll-contain">
+            <div className="min-h-full flex items-center justify-center p-4 text-center">
+              <motion.div 
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+                onClick={() => setModal(null)}
+              />
+              <motion.div 
+                initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+                className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl relative z-10 my-4 text-left"
+                onClick={e => e.stopPropagation()}
+              >
               <div className="h-48 md:h-64 w-full relative">
                 <img src={selectedFestival.image} alt={selectedFestival.name} className="w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent"></div>
@@ -821,7 +825,8 @@ export default function HomePage() {
                 </div>
               </div>
             </motion.div>
-          </motion.div>
+            </div>
+          </div>
         )}
       </AnimatePresence>
     </div>
