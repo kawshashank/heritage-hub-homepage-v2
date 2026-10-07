@@ -33,7 +33,7 @@ const UPCOMING_FESTIVALS = [
     dateObj: "2027-04-07",
     dateStr: "Apr 7, 2027",
     desc: "The Kashmiri Hindu New Year, marking the first day of the Chaitra Navratras.",
-    history: "Navreh is derived from the Sanskrit word 'Nava Varsha', meaning New Year. Celebrated on the first day of Chaitra Navratras, it begins with the beautiful tradition of looking at a 'Thaal' (plate) filled with rice, yogurt, a coin, a mirror, walnut, pen, and the almanac (Jantri) first thing in the morning. It represents a prayer for prosperity and sweetness.",
+    history: "Navreh is derived from the Sanskrit word 'Nava Varsha', meaning New Year. Celebrated on the first day of Chaitra Navratras, it begins with the beautiful tradition of looking at a 'Thaal' (plate) filled with rice, yogurt, a coin, a mirror, walnut, pen, and the traditional almanac first thing in the morning. It represents a prayer for prosperity and sweetness.",
     image: "/festivals/navreh.jpg"
   },
   {
