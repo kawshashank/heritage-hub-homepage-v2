@@ -14,6 +14,7 @@ function generateOTP() {
 
 async function getAuthenticatedUser() {
   const session = await getServerSession(authOptions);
+  if ((session as any)?.invalidated) return null;
   const email = session?.user?.email?.trim().toLowerCase();
   if (!email) return null;
   return await prisma.user.findUnique({ where: { email } });

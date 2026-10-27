@@ -137,9 +137,68 @@ const allTools = [
   { name: 'Suggest a Tool', desc: 'Got a brilliant idea?', icon: Lightbulb, href: '#', action: 'suggest' }
 ];
 
+const HERITAGE_THOUGHTS = [
+  {
+    quote: "Preserving traditions today, for generations tomorrow.",
+    subtitle: "Our heritage, carried forward.",
+  },
+  {
+    quote: "Uprooted from our soil, yet unbroken in our soul.",
+    subtitle: "Resilience in every generation.",
+  },
+  {
+    quote: "Where the Vitasta flows in memory, our roots remain eternal.",
+    subtitle: "The sacred valley within us.",
+  },
+  {
+    quote: "Children of Sharada—carrying the light of knowledge wherever we go.",
+    subtitle: "Namaste Sharada Devi.",
+  },
+  {
+    quote: "A home is not just walls of stone; it lives in every ritual we keep alive.",
+    subtitle: "From Hearath to Navreh.",
+  },
+  {
+    quote: "Every spoken word of Koshur is a bridge back to our ancestors.",
+    subtitle: "Keep our mother tongue alive.",
+  },
+  {
+    quote: "Distance may separate us from Kashmir, never from our Kashmiriyat and Sanskriti.",
+    subtitle: "One community, across the world.",
+  },
+  {
+    quote: "In remembering our Pitras and Tithis, we honour the lineage that made us.",
+    subtitle: "Sacred continuity of family.",
+  },
+  {
+    quote: "Like the Chinar in autumn, we have weathered the storm and stood tall.",
+    subtitle: "Rooted in five thousand years.",
+  },
+  {
+    quote: "May the Thal of Navreh always remind our children of who they are.",
+    subtitle: "Passing the torch of tradition.",
+  },
+];
+
 export default function HomePage() {
   const { data: session } = useSession();
   const [activeSlide, setActiveSlide] = useState(0);
+  const [thoughtIndex, setThoughtIndex] = useState(0);
+
+  // Pick initial 5-minute thought slot on mount
+  useEffect(() => {
+    const FIVE_MINS_MS = 5 * 60 * 1000;
+    const slot = Math.floor(Date.now() / FIVE_MINS_MS) % HERITAGE_THOUGHTS.length;
+    setThoughtIndex(slot);
+  }, []);
+
+  // Rotate to the next thought every 5 minutes (resets timer on manual prev/next click)
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setThoughtIndex((prev) => (prev + 1) % HERITAGE_THOUGHTS.length);
+    }, 5 * 60 * 1000);
+    return () => clearInterval(timer);
+  }, [thoughtIndex]);
 
   // Auth & Profile Modals
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -481,61 +540,61 @@ export default function HomePage() {
               </AnimatePresence>
             </div>
 
-            {/* Mobile Auth Card */}
-            <div className="mb-6 p-4 rounded-2xl bg-white/5 border border-white/10">
+            {/* Mobile Auth Card (Compact) */}
+            <div className="mb-5 p-3 rounded-xl bg-white/5 border border-white/10">
               {session?.user ? (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-8 h-8 rounded-full bg-amber-400 text-stone-900 flex items-center justify-center text-xs font-extrabold shrink-0">
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-7 h-7 rounded-full bg-amber-400 text-stone-900 flex items-center justify-center text-[11px] font-extrabold shrink-0">
                         {userFirstName?.[0]?.toUpperCase() || 'U'}
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-bold text-white truncate">{session.user.name}</p>
-                        <p className="text-[11px] text-white/60 truncate">{session.user.email}</p>
+                        <p className="text-xs font-bold text-white truncate leading-tight">{session.user.name}</p>
+                        <p className="text-[10px] text-white/55 truncate leading-tight">{session.user.email}</p>
                       </div>
                     </div>
+                    <button
+                      onClick={() => signOut({ callbackUrl: "/" })}
+                      className="px-2.5 py-1.5 rounded-lg bg-rose-500/20 border border-rose-500/30 text-rose-300 text-[11px] font-bold flex items-center gap-1 shrink-0"
+                    >
+                      <LogOut className="w-3 h-3" />
+                      Sign Out
+                    </button>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 pt-1">
+                  <div className="grid grid-cols-2 gap-2">
                     <button
                       onClick={() => { setMobileMenuOpen(false); scrollToSavedSection(); }}
-                      className="py-2.5 px-3 rounded-xl bg-amber-500/20 border border-amber-400/30 text-amber-300 text-xs font-bold flex items-center justify-center gap-1.5"
+                      className="py-1.5 px-2.5 rounded-lg bg-amber-500/20 border border-amber-400/30 text-amber-300 text-[11px] font-bold flex items-center justify-center gap-1.5"
                     >
-                      <Bookmark className="w-3.5 h-3.5" />
+                      <Bookmark className="w-3 h-3" />
                       Saved Tithis
                     </button>
                     <button
                       onClick={() => { setMobileMenuOpen(false); setIsChangePasswordOpen(true); }}
-                      className="py-2.5 px-3 rounded-xl bg-white/10 text-white/90 text-xs font-semibold flex items-center justify-center gap-1.5"
+                      className="py-1.5 px-2.5 rounded-lg bg-white/10 text-white/90 text-[11px] font-semibold flex items-center justify-center gap-1.5"
                     >
-                      <Lock className="w-3.5 h-3.5" />
-                      Password
+                      <Lock className="w-3 h-3" />
+                      Change Password
                     </button>
                   </div>
-                  <button
-                    onClick={() => signOut({ callbackUrl: "/" })}
-                    className="w-full py-2.5 rounded-xl bg-rose-500/20 border border-rose-500/30 text-rose-300 text-xs font-bold flex items-center justify-center gap-1.5"
-                  >
-                    <LogOut className="w-3.5 h-3.5" />
-                    Sign Out
-                  </button>
                 </div>
               ) : (
-                <div className="flex flex-col gap-2.5">
-                  <p className="text-xs text-white/80 leading-relaxed">
-                    Save family <strong>Vohorvod</strong> &amp; <strong>Shraad</strong> dates so you never have to re-enter them.
-                  </p>
-                  <div className="grid grid-cols-2 gap-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] text-white/75 leading-snug">
+                    Save family <strong>Vohorvod</strong> &amp; <strong>Shraad</strong> dates
+                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       onClick={() => { setMobileMenuOpen(false); setAuthModalView("login"); setIsAuthModalOpen(true); }}
-                      className="py-2.5 rounded-xl bg-amber-500 text-stone-950 font-bold text-xs flex items-center justify-center gap-1.5"
+                      className="py-1.5 px-3 rounded-lg bg-amber-500 text-stone-950 font-bold text-[11px] flex items-center gap-1 whitespace-nowrap"
                     >
-                      <LogIn className="w-3.5 h-3.5" />
+                      <LogIn className="w-3 h-3" />
                       Sign In
                     </button>
                     <button
                       onClick={() => { setMobileMenuOpen(false); setAuthModalView("register"); setIsAuthModalOpen(true); }}
-                      className="py-2.5 rounded-xl bg-white/10 border border-white/20 text-white font-bold text-xs"
+                      className="py-1.5 px-3 rounded-lg bg-white/10 border border-white/20 text-white font-bold text-[11px] whitespace-nowrap"
                     >
                       Sign Up
                     </button>
@@ -569,15 +628,62 @@ export default function HomePage() {
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             {session?.user ? (
-              <button
-                onClick={scrollToSavedSection}
-                className="flex items-center gap-1 px-2 py-1 sm:px-3 sm:py-1.5 rounded-full bg-amber-500/25 border border-amber-400/40 text-amber-200 text-[10px] sm:text-[11px] font-bold"
-              >
-                <div className="w-4 h-4 rounded-full bg-amber-400 text-stone-900 flex items-center justify-center text-[9px] font-extrabold shrink-0">
-                  {userFirstName?.[0]?.toUpperCase() || 'U'}
-                </div>
-                <span className="max-w-[58px] sm:max-w-[90px] truncate">{userFirstName}</span>
-              </button>
+              <div className="relative">
+                <button
+                  onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+                  className="flex items-center gap-1 px-2 py-1 sm:px-3 sm:py-1.5 rounded-full bg-amber-500/25 border border-amber-400/40 text-amber-200 text-[10px] sm:text-[11px] font-bold"
+                >
+                  <div className="w-4 h-4 rounded-full bg-amber-400 text-stone-900 flex items-center justify-center text-[9px] font-extrabold shrink-0">
+                    {userFirstName?.[0]?.toUpperCase() || 'U'}
+                  </div>
+                  <span className="max-w-[58px] sm:max-w-[90px] truncate">{userFirstName}</span>
+                  <ChevronDown className={`w-3 h-3 shrink-0 transition-transform ${userDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                <AnimatePresence>
+                  {userDropdownOpen && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-40"
+                        onClick={() => setUserDropdownOpen(false)}
+                      />
+                      <motion.div
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 5 }}
+                        className="absolute right-0 mt-2 w-52 bg-white text-stone-800 rounded-2xl shadow-2xl border border-stone-200 py-2 z-50 overflow-hidden"
+                      >
+                        <div className="px-4 py-2 border-b border-stone-100">
+                          <p className="text-xs font-bold text-stone-800 truncate">{session.user.name}</p>
+                          <p className="text-[10px] text-stone-400 truncate">{session.user.email}</p>
+                        </div>
+                        <button
+                          onClick={() => { setUserDropdownOpen(false); scrollToSavedSection(); }}
+                          className="w-full text-left px-4 py-2.5 text-xs font-semibold text-stone-700 hover:bg-amber-50 hover:text-[#6d3029] flex items-center gap-2.5 transition-colors"
+                        >
+                          <Bookmark className="w-3.5 h-3.5 text-amber-700" />
+                          My Saved Tithis
+                        </button>
+                        <button
+                          onClick={() => { setUserDropdownOpen(false); setIsChangePasswordOpen(true); }}
+                          className="w-full text-left px-4 py-2.5 text-xs font-semibold text-stone-700 hover:bg-stone-50 flex items-center gap-2.5 transition-colors"
+                        >
+                          <Lock className="w-3.5 h-3.5 text-stone-500" />
+                          Change Password
+                        </button>
+                        <div className="h-px bg-stone-100 my-1" />
+                        <button
+                          onClick={() => signOut({ callbackUrl: "/" })}
+                          className="w-full text-left px-4 py-2.5 text-xs font-bold text-rose-600 hover:bg-rose-50 flex items-center gap-2.5 transition-colors"
+                        >
+                          <LogOut className="w-3.5 h-3.5" />
+                          Sign Out
+                        </button>
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
+              </div>
             ) : (
               <button
                 onClick={() => { setAuthModalView("login"); setIsAuthModalOpen(true); }}
@@ -848,16 +954,64 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Quote Banner */}
+        {/* Quote Banner (Rotates every 5 minutes across 10 Kashmiri Pandit thoughts + manual Prev/Next) */}
         <div className="col-span-1 md:col-span-2 lg:col-span-1 flex flex-col justify-end mt-4 md:mt-0">
-          <div className="bg-amber-50 rounded-3xl p-8 border border-amber-200 flex flex-col justify-center h-full relative overflow-hidden shadow-sm hover:shadow-md transition-shadow group">
+          <div className="bg-amber-50 rounded-3xl p-7 sm:p-8 border border-amber-200 flex flex-col justify-between h-full relative overflow-hidden shadow-sm hover:shadow-md transition-shadow group">
             <Quote className="absolute -top-4 -right-4 w-32 h-32 text-amber-200/40 transform -rotate-12 pointer-events-none group-hover:-rotate-6 transition-transform duration-500" />
-            <h3 className="font-serif font-bold text-xl sm:text-2xl text-amber-900 leading-snug relative z-10">
-              Preserving traditions today, for generations tomorrow.
-            </h3>
-            <p className="text-amber-700/80 text-[10px] sm:text-xs font-bold uppercase tracking-widest mt-6 relative z-10">
-              Our heritage, carried forward.
-            </p>
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={thoughtIndex}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.35 }}
+                className="relative z-10"
+              >
+                <h3 className="font-serif font-bold text-xl sm:text-2xl text-amber-900 leading-snug">
+                  {HERITAGE_THOUGHTS[thoughtIndex].quote}
+                </h3>
+              </motion.div>
+            </AnimatePresence>
+
+            <div className="relative z-10 flex items-center justify-between gap-3 mt-6 pt-1">
+              <AnimatePresence mode="wait">
+                <motion.p
+                  key={`sub-${thoughtIndex}`}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.25 }}
+                  className="text-amber-700/80 text-[10px] sm:text-xs font-bold uppercase tracking-widest"
+                >
+                  {HERITAGE_THOUGHTS[thoughtIndex].subtitle}
+                </motion.p>
+              </AnimatePresence>
+
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setThoughtIndex(
+                      (prev) => (prev - 1 + HERITAGE_THOUGHTS.length) % HERITAGE_THOUGHTS.length
+                    )
+                  }
+                  aria-label="Previous thought"
+                  className="w-6 h-6 rounded-full border border-amber-300/70 bg-amber-100/50 hover:bg-amber-200/70 text-amber-800/80 hover:text-amber-950 flex items-center justify-center transition-colors active:scale-95"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setThoughtIndex((prev) => (prev + 1) % HERITAGE_THOUGHTS.length)
+                  }
+                  aria-label="Next thought"
+                  className="w-6 h-6 rounded-full border border-amber-300/70 bg-amber-100/50 hover:bg-amber-200/70 text-amber-800/80 hover:text-amber-950 flex items-center justify-center transition-colors active:scale-95"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -931,7 +1085,7 @@ export default function HomePage() {
                       const formData = new FormData(e.currentTarget);
                       const email = formData.get('email');
                       const message = formData.get('message');
-                      window.location.href = `mailto:kawshashank@gmail.com?subject=Contact Request from Heritage Hub&body=${encodeURIComponent("From: " + email + "\n\n" + message)}`;
+                      window.location.href = `mailto:vitastahub@gmail.com?subject=Contact Request from Heritage Hub&body=${encodeURIComponent("From: " + email + "\n\n" + message)}`;
                       setModal(null);
                     }} 
                     className="text-left space-y-4"
@@ -1009,7 +1163,7 @@ export default function HomePage() {
                       const longDesc = formData.get('longDesc');
                       
                       const bodyText = `New Tool Suggestion: ${toolName}\n\nShort Description:\n${shortDesc}\n\nLong Description:\n${longDesc}\n\nFrom: ${email}`;
-                      window.location.href = `mailto:kawshashank@gmail.com?subject=[Heritage Hub] New Tool Suggestion: ${toolName}&body=${encodeURIComponent(bodyText)}`;
+                      window.location.href = `mailto:vitastahub@gmail.com?subject=[Heritage Hub] New Tool Suggestion: ${toolName}&body=${encodeURIComponent(bodyText)}`;
                       setModal(null);
                     }} 
                     className="text-left space-y-4"

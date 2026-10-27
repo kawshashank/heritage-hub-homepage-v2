@@ -9,7 +9,7 @@ const ACTIVITY_STORAGE_KEY = "vitasta_last_activity";
 const KEEP_ALIVE_INTERVAL_MS = 5 * 60 * 1000; // Refresh token every 5 mins of active usage
 
 function SessionInactivityGuard() {
-  const { status, update } = useSession();
+  const { data: session, status, update } = useSession();
   const lastKeepAliveRef = useRef<number>(Date.now());
   const isSigningOutRef = useRef<boolean>(false);
 
@@ -23,6 +23,24 @@ function SessionInactivityGuard() {
     }
 
     if (status !== "authenticated") return;
+
+    const triggerAnotherDeviceLogout = () => {
+      if (isSigningOutRef.current) return;
+      isSigningOutRef.current = true;
+      try {
+        localStorage.removeItem(ACTIVITY_STORAGE_KEY);
+      } catch {}
+      toast("Signed out because your account was logged in on another device.", {
+        icon: "🔒",
+        duration: 5000,
+      });
+      signOut({ redirect: false });
+    };
+
+    if ((session as any)?.invalidated) {
+      triggerAnotherDeviceLogout();
+      return;
+    }
 
     const triggerIdleLogout = () => {
       if (isSigningOutRef.current) return;
@@ -48,6 +66,17 @@ function SessionInactivityGuard() {
     } catch {}
 
     let lastRecorded = now;
+
+    const verifySingleSessionOnServer = () => {
+      fetch("/api/hub-session", { credentials: "include" })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data?.invalidated) {
+            triggerAnotherDeviceLogout();
+          }
+        })
+        .catch(() => {});
+    };
 
     const handleUserActivity = () => {
       const current = Date.now();
@@ -75,20 +104,24 @@ function SessionInactivityGuard() {
       }
     };
 
-    const checkInactivity = () => {
+    const checkInactivityAndSession = () => {
       const current = Date.now();
       try {
         const stored = localStorage.getItem(ACTIVITY_STORAGE_KEY);
         const lastActive = stored ? Number(stored) : lastRecorded;
         if (current - lastActive >= INACTIVITY_LIMIT_MS) {
           triggerIdleLogout();
+          return;
         }
       } catch {}
+      if (document.visibilityState === "visible") {
+        verifySingleSessionOnServer();
+      }
     };
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        checkInactivity();
+        checkInactivityAndSession();
       }
     };
 
@@ -97,7 +130,7 @@ function SessionInactivityGuard() {
       window.addEventListener(evt, handleUserActivity, { passive: true })
     );
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    const intervalId = window.setInterval(checkInactivity, 30_000);
+    const intervalId = window.setInterval(checkInactivityAndSession, 20_000);
 
     return () => {
       events.forEach((evt) =>
@@ -106,7 +139,7 @@ function SessionInactivityGuard() {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.clearInterval(intervalId);
     };
-  }, [status, update]);
+  }, [status, session, update]);
 
   return null;
 }

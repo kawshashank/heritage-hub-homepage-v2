@@ -36,11 +36,14 @@ export async function OPTIONS(request: Request) {
 export async function GET(request: Request) {
   const origin = request.headers.get("origin");
   const session = await getServerSession(authOptions);
+  const isInvalidated = Boolean((session as any)?.invalidated);
+  const isAuthenticated = Boolean(session?.user) && !isInvalidated;
 
   return NextResponse.json(
     {
-      authenticated: Boolean(session?.user),
-      user: session?.user
+      authenticated: isAuthenticated,
+      invalidated: isInvalidated,
+      user: isAuthenticated && session?.user
         ? {
             name: session.user.name,
             email: session.user.email,

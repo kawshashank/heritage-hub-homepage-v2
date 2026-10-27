@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import NextAuth, { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
@@ -38,6 +39,20 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Account not verified");
         }
 
+        // Single-Session Enforcement (Option 1):
+        // Delete any existing active session(s) for this user and issue a fresh sessionToken
+        const sessionToken = crypto.randomUUID();
+        await prisma.session.deleteMany({
+          where: { userId: user.id },
+        });
+        await prisma.session.create({
+          data: {
+            userId: user.id,
+            sessionToken,
+            expires: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
+          },
+        });
+
         return {
           id: user.id,
           email: user.email,
@@ -47,6 +62,7 @@ export const authOptions: NextAuthOptions = {
             user.email,
           firstName: user.firstName,
           lastName: user.lastName,
+          sessionToken,
         } as any;
       },
     }),
@@ -68,6 +84,29 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).id = token.sub;
         (session.user as any).firstName = token.firstName;
         (session.user as any).lastName = token.lastName;
+
+        // Verify this JWT's sessionToken is still the single active session in DB
+        if (token.sessionToken) {
+          const activeSession = await prisma.session.findUnique({
+            where: { sessionToken: token.sessionToken as string },
+          });
+
+          if (
+            !activeSession ||
+            activeSession.userId !== token.sub ||
+            activeSession.expires < new Date()
+          ) {
+            (session as any).invalidated = true;
+          } else {
+            // Slide active DB session expiry forward by 1 hour
+            await prisma.session
+              .update({
+                where: { id: activeSession.id },
+                data: { expires: new Date(Date.now() + 60 * 60 * 1000) },
+              })
+              .catch(() => {});
+          }
+        }
       }
       return session;
     },
@@ -76,8 +115,18 @@ export const authOptions: NextAuthOptions = {
         token.sub = user.id;
         token.firstName = (user as any).firstName;
         token.lastName = (user as any).lastName;
+        token.sessionToken = (user as any).sessionToken;
       }
       return token;
+    },
+  },
+  events: {
+    async signOut({ token }) {
+      if (token?.sub) {
+        await prisma.session
+          .deleteMany({ where: { userId: token.sub as string } })
+          .catch(() => {});
+      }
     },
   },
 };
