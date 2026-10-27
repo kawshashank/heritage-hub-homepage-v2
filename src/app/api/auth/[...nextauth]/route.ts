@@ -40,18 +40,20 @@ export const authOptions: NextAuthOptions = {
         }
 
         // Single-Session Enforcement (Option 1):
-        // Delete any existing active session(s) for this user and issue a fresh sessionToken
+        // Delete any existing active session(s) for this user and issue a fresh sessionToken in one transaction
         const sessionToken = crypto.randomUUID();
-        await prisma.session.deleteMany({
-          where: { userId: user.id },
-        });
-        await prisma.session.create({
-          data: {
-            userId: user.id,
-            sessionToken,
-            expires: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
-          },
-        });
+        await prisma.$transaction([
+          prisma.session.deleteMany({
+            where: { userId: user.id },
+          }),
+          prisma.session.create({
+            data: {
+              userId: user.id,
+              sessionToken,
+              expires: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
+            },
+          }),
+        ]);
 
         return {
           id: user.id,
@@ -89,20 +91,22 @@ export const authOptions: NextAuthOptions = {
         if (token.sessionToken) {
           const activeSession = await prisma.session.findUnique({
             where: { sessionToken: token.sessionToken as string },
+            select: { id: true, userId: true, expires: true },
           });
 
+          const now = Date.now();
           if (
             !activeSession ||
             activeSession.userId !== token.sub ||
-            activeSession.expires < new Date()
+            activeSession.expires.getTime() < now
           ) {
             (session as any).invalidated = true;
-          } else {
-            // Slide active DB session expiry forward by 1 hour
+          } else if (activeSession.expires.getTime() - now < 55 * 60 * 1000) {
+            // Only write to DB when >5 minutes have elapsed since last slide
             await prisma.session
               .update({
                 where: { id: activeSession.id },
-                data: { expires: new Date(Date.now() + 60 * 60 * 1000) },
+                data: { expires: new Date(now + 60 * 60 * 1000) },
               })
               .catch(() => {});
           }
@@ -122,9 +126,9 @@ export const authOptions: NextAuthOptions = {
   },
   events: {
     async signOut({ token }) {
-      if (token?.sub) {
+      if (token?.sessionToken) {
         await prisma.session
-          .deleteMany({ where: { userId: token.sub as string } })
+          .deleteMany({ where: { sessionToken: token.sessionToken as string } })
           .catch(() => {});
       }
     },

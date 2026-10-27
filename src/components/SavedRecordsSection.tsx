@@ -135,18 +135,44 @@ export default function SavedRecordsSection({
 
   const currentYear = new Date().getFullYear();
 
-  const loadRecords = async () => {
-    setLoading(true);
+  const cacheKey = `vitasta_vault_cache_${(userEmail || "").trim().toLowerCase()}`;
+
+  const persistCache = (nextV: any[], nextS: any[]) => {
+    try {
+      localStorage.setItem(
+        cacheKey,
+        JSON.stringify({ vohorvods: nextV, shraads: nextS })
+      );
+    } catch {}
+  };
+
+  const loadRecords = async (silent = false) => {
+    if (!silent) setLoading(true);
     const res = await getSavedRecords();
-    setVohorvods(res.vohorvods || []);
-    setShraads(res.shraads || []);
+    const nextV = res.vohorvods || [];
+    const nextS = res.shraads || [];
+    setVohorvods(nextV);
+    setShraads(nextS);
+    persistCache(nextV, nextS);
     setLoading(false);
   };
 
   useEffect(() => {
-    if (userEmail) {
-      loadRecords();
-    }
+    if (!userEmail) return;
+    let hasCached = false;
+    try {
+      const raw = localStorage.getItem(cacheKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed?.vohorvods) && Array.isArray(parsed?.shraads)) {
+          setVohorvods(parsed.vohorvods);
+          setShraads(parsed.shraads);
+          setLoading(false);
+          hasCached = true;
+        }
+      }
+    } catch {}
+    loadRecords(hasCached);
   }, [userEmail]);
 
   // Sync Vohorvod mobile dropdowns -> vDob
@@ -254,7 +280,17 @@ export default function SavedRecordsSection({
     } else {
       toast.success(editingVohorvodId ? "Vohorvod updated!" : "Vohorvod saved!");
       setVohorvodModalOpen(false);
-      loadRecords();
+      if (res?.item) {
+        setVohorvods((prev) => {
+          const next = editingVohorvodId
+            ? prev.map((it) => (it.id === editingVohorvodId ? res.item : it))
+            : [res.item, ...prev];
+          persistCache(next, shraads);
+          return next;
+        });
+      } else {
+        loadRecords(true);
+      }
     }
   };
 
@@ -265,7 +301,11 @@ export default function SavedRecordsSection({
       toast.error(res.error);
     } else {
       toast.success("Removed from Saved Vohorvods.");
-      setVohorvods((prev) => prev.filter((item) => item.id !== id));
+      setVohorvods((prev) => {
+        const next = prev.filter((item) => item.id !== id);
+        persistCache(next, shraads);
+        return next;
+      });
     }
   };
 
@@ -322,7 +362,17 @@ export default function SavedRecordsSection({
     } else {
       toast.success(editingShraadId ? "Shraad updated!" : "Shraad saved!");
       setShraadModalOpen(false);
-      loadRecords();
+      if (res?.item) {
+        setShraads((prev) => {
+          const next = editingShraadId
+            ? prev.map((it) => (it.id === editingShraadId ? res.item : it))
+            : [res.item, ...prev];
+          persistCache(vohorvods, next);
+          return next;
+        });
+      } else {
+        loadRecords(true);
+      }
     }
   };
 
@@ -333,7 +383,11 @@ export default function SavedRecordsSection({
       toast.error(res.error);
     } else {
       toast.success("Removed from Saved Shraads.");
-      setShraads((prev) => prev.filter((item) => item.id !== id));
+      setShraads((prev) => {
+        const next = prev.filter((item) => item.id !== id);
+        persistCache(vohorvods, next);
+        return next;
+      });
     }
   };
 

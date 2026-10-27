@@ -20,6 +20,21 @@ async function getAuthenticatedUser() {
   return await prisma.user.findUnique({ where: { email } });
 }
 
+async function getAuthenticatedUserId(): Promise<string | null> {
+  const session = await getServerSession(authOptions);
+  if ((session as any)?.invalidated) return null;
+  const sessionUserId = (session?.user as any)?.id as string | undefined;
+  if (sessionUserId) return sessionUserId;
+
+  const email = session?.user?.email?.trim().toLowerCase();
+  if (!email) return null;
+  const user = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true },
+  });
+  return user?.id ?? null;
+}
+
 export async function registerUser(formData: FormData) {
   try {
     const firstName = (formData.get("firstName") as string || "").trim();
@@ -287,16 +302,16 @@ export async function changePassword(oldPass: string, newPass: string) {
 
 export async function getSavedRecords() {
   try {
-    const user = await getAuthenticatedUser();
-    if (!user) return { vohorvods: [], shraads: [] };
+    const userId = await getAuthenticatedUserId();
+    if (!userId) return { vohorvods: [], shraads: [] };
 
     const [vohorvods, shraads] = await Promise.all([
       prisma.savedVohorvod.findMany({
-        where: { userId: user.id },
+        where: { userId },
         orderBy: { createdAt: "desc" },
       }),
       prisma.savedShraad.findMany({
-        where: { userId: user.id },
+        where: { userId },
         orderBy: { createdAt: "desc" },
       }),
     ]);
@@ -320,8 +335,8 @@ export async function saveVohorvodRecord(data: {
   tithi?: string;
 }) {
   try {
-    const user = await getAuthenticatedUser();
-    if (!user) return { error: "Please sign in to save records." };
+    const userId = await getAuthenticatedUserId();
+    if (!userId) return { error: "Please sign in to save records." };
 
     const personName = (data.personName || "").trim();
     if (!personName) return { error: "Please enter the person's name." };
@@ -339,8 +354,11 @@ export async function saveVohorvodRecord(data: {
     }
 
     if (data.id) {
-      const existing = await prisma.savedVohorvod.findUnique({ where: { id: data.id } });
-      if (!existing || existing.userId !== user.id) {
+      const existing = await prisma.savedVohorvod.findUnique({
+        where: { id: data.id },
+        select: { userId: true },
+      });
+      if (!existing || existing.userId !== userId) {
         return { error: "Record not found or unauthorized." };
       }
       const updated = await prisma.savedVohorvod.update({
@@ -354,11 +372,10 @@ export async function saveVohorvodRecord(data: {
           tithi: data.mode === "by_tithi" ? data.tithi : null,
         },
       });
-      revalidatePath("/");
       return { success: true, item: updated };
     } else {
       const currentCount = await prisma.savedVohorvod.count({
-        where: { userId: user.id },
+        where: { userId },
       });
       if (currentCount >= MAX_SAVED_PER_CATEGORY) {
         return {
@@ -374,10 +391,9 @@ export async function saveVohorvodRecord(data: {
           lunarMonth: data.mode === "by_tithi" ? data.lunarMonth : null,
           paksha: data.mode === "by_tithi" ? data.paksha : null,
           tithi: data.mode === "by_tithi" ? data.tithi : null,
-          userId: user.id,
+          userId,
         },
       });
-      revalidatePath("/");
       return { success: true, item: created };
     }
   } catch (err: any) {
@@ -388,16 +404,16 @@ export async function saveVohorvodRecord(data: {
 
 export async function deleteVohorvodRecord(id: string) {
   try {
-    const user = await getAuthenticatedUser();
-    if (!user) return { error: "Not authenticated." };
+    const userId = await getAuthenticatedUserId();
+    if (!userId) return { error: "Not authenticated." };
 
-    const existing = await prisma.savedVohorvod.findUnique({ where: { id } });
-    if (!existing || existing.userId !== user.id) {
+    const deleted = await prisma.savedVohorvod.deleteMany({
+      where: { id, userId },
+    });
+    if (deleted.count === 0) {
       return { error: "Record not found or unauthorized." };
     }
 
-    await prisma.savedVohorvod.delete({ where: { id } });
-    revalidatePath("/");
     return { success: true };
   } catch (err: any) {
     console.error("deleteVohorvodRecord error:", err);
@@ -416,8 +432,8 @@ export async function saveShraadRecord(data: {
   timezone?: string;
 }) {
   try {
-    const user = await getAuthenticatedUser();
-    if (!user) return { error: "Please sign in to save records." };
+    const userId = await getAuthenticatedUserId();
+    if (!userId) return { error: "Please sign in to save records." };
 
     const personName = (data.personName || "").trim();
     if (!personName) return { error: "Please enter the departed soul's name." };
@@ -437,19 +453,21 @@ export async function saveShraadRecord(data: {
     };
 
     if (data.id) {
-      const existing = await prisma.savedShraad.findUnique({ where: { id: data.id } });
-      if (!existing || existing.userId !== user.id) {
+      const existing = await prisma.savedShraad.findUnique({
+        where: { id: data.id },
+        select: { userId: true },
+      });
+      if (!existing || existing.userId !== userId) {
         return { error: "Record not found or unauthorized." };
       }
       const updated = await prisma.savedShraad.update({
         where: { id: data.id },
         data: payload,
       });
-      revalidatePath("/");
       return { success: true, item: updated };
     } else {
       const currentCount = await prisma.savedShraad.count({
-        where: { userId: user.id },
+        where: { userId },
       });
       if (currentCount >= MAX_SAVED_PER_CATEGORY) {
         return {
@@ -460,10 +478,9 @@ export async function saveShraadRecord(data: {
       const created = await prisma.savedShraad.create({
         data: {
           ...payload,
-          userId: user.id,
+          userId,
         },
       });
-      revalidatePath("/");
       return { success: true, item: created };
     }
   } catch (err: any) {
@@ -474,16 +491,16 @@ export async function saveShraadRecord(data: {
 
 export async function deleteShraadRecord(id: string) {
   try {
-    const user = await getAuthenticatedUser();
-    if (!user) return { error: "Not authenticated." };
+    const userId = await getAuthenticatedUserId();
+    if (!userId) return { error: "Not authenticated." };
 
-    const existing = await prisma.savedShraad.findUnique({ where: { id } });
-    if (!existing || existing.userId !== user.id) {
+    const deleted = await prisma.savedShraad.deleteMany({
+      where: { id, userId },
+    });
+    if (deleted.count === 0) {
       return { error: "Record not found or unauthorized." };
     }
 
-    await prisma.savedShraad.delete({ where: { id } });
-    revalidatePath("/");
     return { success: true };
   } catch (err: any) {
     console.error("deleteShraadRecord error:", err);
