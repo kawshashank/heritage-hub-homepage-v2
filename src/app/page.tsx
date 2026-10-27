@@ -1,9 +1,13 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, ChevronRight, ChevronLeft, Calculator, Calendar, BookOpen, MoreHorizontal, MessageCircle, Quote, ArrowRight, X, Menu, Lightbulb, MessageSquare, ShieldCheck } from 'lucide-react';
+import { Search, ChevronRight, ChevronLeft, Calculator, Calendar, BookOpen, MessageCircle, Quote, ArrowRight, X, Menu, Lightbulb, MessageSquare, ShieldCheck, LogIn, LogOut, User, Lock, ChevronDown, Sparkles, Bookmark } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from "next/link";
+import { useSession, signOut } from "next-auth/react";
+import AuthModal from "@/components/AuthModal";
+import ChangePasswordModal from "@/components/ChangePasswordModal";
+import SavedRecordsSection from "@/components/SavedRecordsSection";
 
 
 // --- Types ---
@@ -134,7 +138,41 @@ const allTools = [
 ];
 
 export default function HomePage() {
+  const { data: session } = useSession();
   const [activeSlide, setActiveSlide] = useState(0);
+
+  // Auth & Profile Modals
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authModalView, setAuthModalView] = useState<"login" | "register">("login");
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+
+  const userFirstName = useMemo(() => {
+    if (!session?.user) return null;
+    const fn = (session.user as any).firstName || session.user.name?.split(' ')[0] || session.user.email?.split('@')[0];
+    return fn || 'Member';
+  }, [session]);
+
+  const [isLocal, setIsLocal] = useState(false);
+
+  useEffect(() => {
+    setIsLocal(
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1'
+    );
+  }, []);
+
+  const getToolHref = (baseHref: string) => {
+    if (!baseHref.startsWith('/')) return baseHref;
+    let resolved = baseHref;
+    if (isLocal && baseHref === '/vohorvod') resolved = 'http://localhost:3001';
+    if (isLocal && baseHref === '/shraad') resolved = 'http://localhost:3002';
+
+    if ((baseHref === '/vohorvod' || baseHref === '/shraad') && userFirstName) {
+      return `${resolved}?hub_user=${encodeURIComponent(userFirstName)}`;
+    }
+    return resolved;
+  };
 
   const nextFestival = useMemo(() => {
     const today = new Date();
@@ -207,7 +245,7 @@ export default function HomePage() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-// Auto-advance slider
+  // Auto-advance slider
   useEffect(() => {
     const timer = setInterval(() => {
       setActiveSlide((prev) => (prev + 1) % slides.length);
@@ -217,7 +255,7 @@ export default function HomePage() {
 
   // Lock body scroll when modal or mobile menu is open
   useEffect(() => {
-    if (modal || mobileMenuOpen) {
+    if (modal || mobileMenuOpen || isAuthModalOpen || isChangePasswordOpen) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = 'unset';
@@ -225,12 +263,19 @@ export default function HomePage() {
     return () => {
       document.body.style.overflow = 'unset';
     };
-  }, [modal, mobileMenuOpen]);
+  }, [modal, mobileMenuOpen, isAuthModalOpen, isChangePasswordOpen]);
 
   const filteredTools = allTools.filter(tool => 
     tool.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
     tool.desc.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const scrollToSavedSection = () => {
+    const el = document.getElementById('saved-family-tithis');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#FDFBF7] text-stone-800 font-sans selection:bg-amber-200 overflow-x-hidden">
@@ -260,13 +305,19 @@ export default function HomePage() {
             <div className="hidden lg:flex items-center gap-3 xl:gap-6 text-sm font-medium text-white/90">
               <button onClick={() => window.scrollTo({top:0, behavior:'smooth'})} className="hover:text-amber-300 transition-colors">Home</button>
               <button onClick={() => window.scrollTo({top:800, behavior:'smooth'})} className="hover:text-amber-300 transition-colors">Our tools</button>
+              {session?.user && (
+                <button onClick={scrollToSavedSection} className="hover:text-amber-300 transition-colors flex items-center gap-1 text-amber-300">
+                  <Bookmark className="w-3.5 h-3.5" />
+                  Saved Tithis
+                </button>
+              )}
               <button onClick={() => setModal('about')} className="hover:text-amber-300 transition-colors">About</button>
               <button onClick={() => setModal('contact')} className="hover:text-amber-300 transition-colors">Contact</button>
             </div>
           </div>
 
-          {/* Desktop Search & Counter */}
-          <div className="hidden lg:flex items-center gap-3 xl:gap-6">
+          {/* Desktop Search, Auth & Counter */}
+          <div className="hidden lg:flex items-center gap-3 xl:gap-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/60" />
               <input 
@@ -274,7 +325,7 @@ export default function HomePage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Find a tool..." 
-                className={`w-40 lg:w-48 xl:w-64 border rounded-full py-2 pl-9 pr-4 text-sm text-white placeholder:text-white/70 focus:outline-none transition-all ${scrolled ? 'bg-white/5 border-white/20 focus:border-amber-400/50 focus:bg-white/10' : 'bg-black/20 border-white/20 focus:border-amber-400/50 focus:bg-black/40 backdrop-blur-md'}`}
+                className={`w-36 lg:w-44 xl:w-56 border rounded-full py-2 pl-9 pr-4 text-sm text-white placeholder:text-white/70 focus:outline-none transition-all ${scrolled ? 'bg-white/5 border-white/20 focus:border-amber-400/50 focus:bg-white/10' : 'bg-black/20 border-white/20 focus:border-amber-400/50 focus:bg-black/40 backdrop-blur-md'}`}
               />
               <AnimatePresence>
                 {searchQuery.trim().length > 0 && (
@@ -287,7 +338,7 @@ export default function HomePage() {
                     {filteredSearchTools.length > 0 ? (
                       <div className="py-2">
                         {filteredSearchTools.map(tool => (
-                          <Link href={tool.path} key={tool.id} onClick={() => setSearchQuery('')} className="block px-4 py-2.5 hover:bg-stone-50 transition-colors">
+                          <Link href={getToolHref(tool.path)} key={tool.id} onClick={() => setSearchQuery('')} className="block px-4 py-2.5 hover:bg-stone-50 transition-colors">
                             <div className="text-sm font-bold text-stone-800">{tool.title}</div>
                           </Link>
                         ))}
@@ -299,6 +350,68 @@ export default function HomePage() {
                 )}
               </AnimatePresence>
             </div>
+
+            {/* Auth Button / Profile Dropdown */}
+            {session?.user ? (
+              <div className="relative">
+                <button
+                  onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+                  className="flex items-center gap-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/40 px-3.5 py-2 rounded-full text-xs font-bold text-amber-200 transition-all"
+                >
+                  <div className="w-5 h-5 rounded-full bg-amber-400 text-stone-900 flex items-center justify-center text-[10px] font-extrabold">
+                    {userFirstName?.[0]?.toUpperCase() || 'U'}
+                  </div>
+                  <span className="max-w-[100px] truncate">{userFirstName}</span>
+                  <ChevronDown className={`w-3.5 h-3.5 transition-transform ${userDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                <AnimatePresence>
+                  {userDropdownOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 5 }}
+                      className="absolute right-0 mt-2 w-52 bg-white text-stone-800 rounded-2xl shadow-2xl border border-stone-200 py-2 z-50 overflow-hidden"
+                    >
+                      <div className="px-4 py-2 border-b border-stone-100">
+                        <p className="text-xs font-bold text-stone-800 truncate">{session.user.name}</p>
+                        <p className="text-[10px] text-stone-400 truncate">{session.user.email}</p>
+                      </div>
+                      <button
+                        onClick={() => { setUserDropdownOpen(false); scrollToSavedSection(); }}
+                        className="w-full text-left px-4 py-2.5 text-xs font-semibold text-stone-700 hover:bg-amber-50 hover:text-[#6d3029] flex items-center gap-2.5 transition-colors"
+                      >
+                        <Bookmark className="w-3.5 h-3.5 text-amber-700" />
+                        My Saved Tithis
+                      </button>
+                      <button
+                        onClick={() => { setUserDropdownOpen(false); setIsChangePasswordOpen(true); }}
+                        className="w-full text-left px-4 py-2.5 text-xs font-semibold text-stone-700 hover:bg-stone-50 flex items-center gap-2.5 transition-colors"
+                      >
+                        <Lock className="w-3.5 h-3.5 text-stone-500" />
+                        Change Password
+                      </button>
+                      <div className="h-px bg-stone-100 my-1" />
+                      <button
+                        onClick={() => signOut({ callbackUrl: "/" })}
+                        className="w-full text-left px-4 py-2.5 text-xs font-bold text-rose-600 hover:bg-rose-50 flex items-center gap-2.5 transition-colors"
+                      >
+                        <LogOut className="w-3.5 h-3.5" />
+                        Sign Out
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            ) : (
+              <button
+                onClick={() => { setAuthModalView("login"); setIsAuthModalOpen(true); }}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/40 text-amber-200 hover:text-white text-xs font-bold tracking-wide transition-all whitespace-nowrap"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                Sign In
+              </button>
+            )}
             
             <div className={`flex flex-col items-end px-4 py-1.5 rounded-lg text-right ${scrolled ? 'bg-white/5 border border-white/10' : 'bg-black/40 backdrop-blur-md border border-white/10'}`}>
               <div className="flex items-baseline gap-1.5 text-amber-400 font-bold">
@@ -333,7 +446,7 @@ export default function HomePage() {
               </button>
             </div>
 
-            <div className="relative mb-8 z-50">
+            <div className="relative mb-6 z-50">
               <div className="relative z-10">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/50" />
                 <input 
@@ -355,7 +468,7 @@ export default function HomePage() {
                     {filteredSearchTools.length > 0 ? (
                       <div className="py-2">
                         {filteredSearchTools.map(tool => (
-                          <Link href={tool.path} key={tool.id} onClick={() => { setSearchQuery(''); setMobileMenuOpen(false); }} className="block px-6 py-3.5 hover:bg-white/5 transition-colors">
+                          <Link href={getToolHref(tool.path)} key={tool.id} onClick={() => { setSearchQuery(''); setMobileMenuOpen(false); }} className="block px-6 py-3.5 hover:bg-white/5 transition-colors">
                             <div className="text-base font-bold text-white">{tool.title}</div>
                           </Link>
                         ))}
@@ -366,6 +479,69 @@ export default function HomePage() {
                   </motion.div>
                 )}
               </AnimatePresence>
+            </div>
+
+            {/* Mobile Auth Card */}
+            <div className="mb-6 p-4 rounded-2xl bg-white/5 border border-white/10">
+              {session?.user ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-full bg-amber-400 text-stone-900 flex items-center justify-center text-xs font-extrabold shrink-0">
+                        {userFirstName?.[0]?.toUpperCase() || 'U'}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-white truncate">{session.user.name}</p>
+                        <p className="text-[11px] text-white/60 truncate">{session.user.email}</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <button
+                      onClick={() => { setMobileMenuOpen(false); scrollToSavedSection(); }}
+                      className="py-2.5 px-3 rounded-xl bg-amber-500/20 border border-amber-400/30 text-amber-300 text-xs font-bold flex items-center justify-center gap-1.5"
+                    >
+                      <Bookmark className="w-3.5 h-3.5" />
+                      Saved Tithis
+                    </button>
+                    <button
+                      onClick={() => { setMobileMenuOpen(false); setIsChangePasswordOpen(true); }}
+                      className="py-2.5 px-3 rounded-xl bg-white/10 text-white/90 text-xs font-semibold flex items-center justify-center gap-1.5"
+                    >
+                      <Lock className="w-3.5 h-3.5" />
+                      Password
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => signOut({ callbackUrl: "/" })}
+                    className="w-full py-2.5 rounded-xl bg-rose-500/20 border border-rose-500/30 text-rose-300 text-xs font-bold flex items-center justify-center gap-1.5"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    Sign Out
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2.5">
+                  <p className="text-xs text-white/80 leading-relaxed">
+                    Save family <strong>Vohorvod</strong> &amp; <strong>Shraad</strong> dates so you never have to re-enter them.
+                  </p>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <button
+                      onClick={() => { setMobileMenuOpen(false); setAuthModalView("login"); setIsAuthModalOpen(true); }}
+                      className="py-2.5 rounded-xl bg-amber-500 text-stone-950 font-bold text-xs flex items-center justify-center gap-1.5"
+                    >
+                      <LogIn className="w-3.5 h-3.5" />
+                      Sign In
+                    </button>
+                    <button
+                      onClick={() => { setMobileMenuOpen(false); setAuthModalView("register"); setIsAuthModalOpen(true); }}
+                      className="py-2.5 rounded-xl bg-white/10 border border-white/20 text-white font-bold text-xs"
+                    >
+                      Sign Up
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex flex-col gap-6 text-xl font-serif text-white">
@@ -382,19 +558,42 @@ export default function HomePage() {
       <div className="relative h-[85vh] min-h-[550px] md:min-h-[600px] w-full overflow-hidden flex flex-col justify-end pb-32 md:pb-40 mt-[52px] lg:mt-0">
         
         {/* Mobile Scrolling Navbar (Attached exactly to the top of Hero, inside Hero container) */}
-        <div className="lg:hidden absolute top-0 inset-x-0 z-[50] flex items-center justify-between px-6 py-4 w-full text-white bg-gradient-to-b from-black/80 via-black/40 to-transparent">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center border border-amber-400/30">
-              <span className="text-amber-400 font-serif font-bold text-lg leading-none">ॐ</span>
+        <div className="lg:hidden absolute top-0 inset-x-0 z-[50] flex items-center justify-between gap-2 px-3.5 sm:px-6 py-3.5 w-full text-white bg-gradient-to-b from-black/80 via-black/40 to-transparent">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-amber-500/20 flex items-center justify-center border border-amber-400/30 shrink-0">
+              <span className="text-amber-400 font-serif font-bold text-base sm:text-lg leading-none">ॐ</span>
             </div>
-            <span className="font-serif font-semibold text-base xl:text-lg tracking-wide whitespace-nowrap">Kashmiri Heritage Hub</span>
+            <span className="font-serif font-semibold text-[13px] sm:text-base tracking-normal whitespace-nowrap">
+              Kashmiri Heritage Hub
+            </span>
           </div>
-          <button 
-            className="text-white hover:text-amber-400 transition-colors"
-            onClick={() => setMobileMenuOpen(true)}
-          >
-            <Menu className="w-6 h-6" />
-          </button>
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+            {session?.user ? (
+              <button
+                onClick={scrollToSavedSection}
+                className="flex items-center gap-1 px-2 py-1 sm:px-3 sm:py-1.5 rounded-full bg-amber-500/25 border border-amber-400/40 text-amber-200 text-[10px] sm:text-[11px] font-bold"
+              >
+                <div className="w-4 h-4 rounded-full bg-amber-400 text-stone-900 flex items-center justify-center text-[9px] font-extrabold shrink-0">
+                  {userFirstName?.[0]?.toUpperCase() || 'U'}
+                </div>
+                <span className="max-w-[58px] sm:max-w-[90px] truncate">{userFirstName}</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => { setAuthModalView("login"); setIsAuthModalOpen(true); }}
+                className="flex items-center gap-1 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full bg-amber-500/25 border border-amber-400/40 text-amber-200 text-[10px] sm:text-[11px] font-bold whitespace-nowrap"
+              >
+                <LogIn className="w-3 h-3" />
+                Sign In
+              </button>
+            )}
+            <button 
+              className="text-white hover:text-amber-400 transition-colors p-1"
+              onClick={() => setMobileMenuOpen(true)}
+            >
+              <Menu className="w-5 h-5 sm:w-6 sm:h-6" />
+            </button>
+          </div>
         </div>
 
         {/* Background Images */}
@@ -441,7 +640,7 @@ export default function HomePage() {
             className="flex items-center w-[90%] sm:w-80 md:w-72 p-4 md:p-6 bg-black/40 backdrop-blur-md border-l-4 border-amber-500 rounded-r-xl md:rounded-r-2xl shadow-lg mt-2 md:mt-0"
           >
             <p className="text-white/95 font-serif italic text-sm md:text-lg leading-relaxed md:leading-snug">
-              "{slides[activeSlide].quote}"
+              &ldquo;{slides[activeSlide].quote}&rdquo;
             </p>
           </motion.div>
         </div>
@@ -476,7 +675,7 @@ export default function HomePage() {
                 {filteredTools.map((tool, idx) => (
                   <a 
                     key={idx} 
-                    href={tool.href}
+                    href={getToolHref(tool.href)}
                     onClick={(e) => {
                       if (tool.action) {
                         e.preventDefault();
@@ -511,7 +710,7 @@ export default function HomePage() {
               {filteredTools.map((tool, idx) => (
                 <a 
                   key={idx} 
-                  href={tool.href}
+                  href={getToolHref(tool.href)}
                   onClick={(e) => {
                     if (tool.action) {
                       e.preventDefault();
@@ -533,11 +732,50 @@ export default function HomePage() {
           <div className="pb-8">
             <div className="bg-white/95 backdrop-blur-xl rounded-2xl p-6 border border-stone-200 shadow-xl flex items-center gap-3 text-stone-500 font-medium text-sm">
               <Search className="w-5 h-5 text-stone-400" />
-              No tools or traditions found for "{searchQuery}".
+              No tools or traditions found for &ldquo;{searchQuery}&rdquo;.
             </div>
           </div>
         )}
       </div>
+
+      {/* Saved Family Tithis Vault (Logged-In View OR Non-Intrusive Sign-In Callout) */}
+      {session?.user?.email ? (
+        <SavedRecordsSection userEmail={session.user.email} userName={userFirstName} />
+      ) : (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-16 pt-2 pb-1">
+          <div className="bg-gradient-to-r from-[#2a1b18] via-[#4a2522] to-[#5a2a24] rounded-2xl p-3.5 sm:px-6 sm:py-4 text-white shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 border border-amber-400/20">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-amber-400/15 border border-amber-400/30 flex items-center justify-center text-amber-300 shrink-0">
+                <Sparkles className="w-4 h-4 sm:w-5 sm:h-5" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="font-serif font-bold text-[13px] sm:text-base text-white leading-snug">
+                  <span className="sm:hidden">Save family Vohorvod &amp; Shraad dates</span>
+                  <span className="hidden sm:inline">Tired of re-typing family Vohorvod &amp; Shraad dates every year?</span>
+                </h3>
+                <p className="text-[11px] sm:text-xs text-amber-100/80 mt-0.5 leading-snug">
+                  <span className="sm:hidden">Create a free account to pre-fill &amp; calculate in one tap.</span>
+                  <span className="hidden sm:inline">Create a free account to save your family&apos;s birth dates &amp; ancestral tithis and calculate them in a single tap.</span>
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 sm:flex items-center gap-2 sm:gap-2.5 w-full sm:w-auto shrink-0">
+              <button
+                onClick={() => { setAuthModalView("register"); setIsAuthModalOpen(true); }}
+                className="h-9 sm:h-10 px-3.5 sm:px-4 rounded-xl bg-amber-400 hover:bg-amber-300 text-stone-950 font-bold text-xs whitespace-nowrap flex items-center justify-center transition-all shadow-sm"
+              >
+                Create Free Account
+              </button>
+              <button
+                onClick={() => { setAuthModalView("login"); setIsAuthModalOpen(true); }}
+                className="h-9 sm:h-10 px-3.5 sm:px-4 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs whitespace-nowrap flex items-center justify-center transition-all"
+              >
+                Sign In
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Bottom Content Grid */}
       <div className="max-w-7xl mx-auto px-6 md:px-16 py-12 md:py-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -589,21 +827,21 @@ export default function HomePage() {
                 <MessageCircle className="w-6 h-6 text-[#25D366] flex-shrink-0 group-hover:scale-110 transition-transform" />
                 <div>
                   <h4 className="font-bold text-stone-800 text-sm group-hover:text-[#25D366] transition-colors">Stay close to the community</h4>
-                  <p className="text-xs text-stone-500 mt-1">WhatsApp updates & connections.</p>
+                  <p className="text-xs text-stone-500 mt-1">WhatsApp updates &amp; connections.</p>
                 </div>
               </div>
               <div className="flex gap-4 group cursor-pointer">
                 <BookOpen className="w-6 h-6 text-blue-600 flex-shrink-0 group-hover:scale-110 transition-transform" />
                 <div>
                   <h4 className="font-bold text-stone-800 text-sm group-hover:text-blue-700 transition-colors">Deepen your roots</h4>
-                  <p className="text-xs text-stone-500 mt-1">Discover guides on our rituals & celebrations.</p>
+                  <p className="text-xs text-stone-500 mt-1">Discover guides on our rituals &amp; celebrations.</p>
                 </div>
               </div>
               <div onClick={() => setModal('suggest')} className="flex gap-4 group cursor-pointer">
                 <Lightbulb className="w-6 h-6 text-amber-600 flex-shrink-0 group-hover:scale-110 transition-transform" />
                 <div>
                   <h4 className="font-bold text-stone-800 text-sm group-hover:text-amber-700 transition-colors">Your ideas belong here</h4>
-                  <p className="text-xs text-stone-500 mt-1">Share feedback & suggest new tools.</p>
+                  <p className="text-xs text-stone-500 mt-1">Share feedback &amp; suggest new tools.</p>
                 </div>
               </div>
             </div>
@@ -624,6 +862,17 @@ export default function HomePage() {
         </div>
 
       </div>
+
+      {/* Auth & Password Modals */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        initialView={authModalView}
+      />
+      <ChangePasswordModal
+        isOpen={isChangePasswordOpen}
+        onClose={() => setIsChangePasswordOpen(false)}
+      />
 
       {/* Modals */}
       <AnimatePresence>
@@ -671,10 +920,10 @@ export default function HomePage() {
                     <MessageSquare className="w-5 h-5" />
                   </div>
                   <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-stone-400 mb-2 block">
-                    Let's Connect
+                    Let&apos;s Connect
                   </span>
                   <h2 className="text-2xl font-serif font-bold text-stone-800 mb-6">
-                    We'd love to hear from you.
+                    We&apos;d love to hear from you.
                   </h2>
                   <form 
                     onSubmit={(e) => {

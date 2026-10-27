@@ -1,0 +1,96 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?
+  access_token       String?
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id             String          @id @default(cuid())
+  name           String?
+  firstName      String?
+  lastName       String?
+  email          String?         @unique
+  password       String?
+  emailVerified  DateTime?
+  image          String?
+  role           String?         @default("USER")
+
+  accounts       Account[]
+  sessions       Session[]
+  savedVohorvods SavedVohorvod[]
+  savedShraads   SavedShraad[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model SavedVohorvod {
+  id         String   @id @default(cuid())
+  personName String
+  mode       String   @default("by_dob") // "by_dob" | "by_tithi"
+  dob        String?  // YYYY-MM-DD when mode === "by_dob"
+  lunarMonth String?  // e.g., "Chetra" when mode === "by_tithi"
+  paksha     String?  // e.g., "Zoon Pachh (Bright)" when mode === "by_tithi"
+  tithi      String?  // e.g., "Pratipada" when mode === "by_tithi"
+
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model SavedShraad {
+  id         String   @id @default(cuid())
+  personName String
+  deathDate  String   // YYYY-MM-DD
+  knowsTime  Boolean  @default(false)
+  deathHour  String?  // "01".."12"
+  deathMin   String?  // "00".."59"
+  deathAmPm  String?  // "AM" | "PM"
+  timezone   String?  @default("Delhi, India (IST)")
+
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
