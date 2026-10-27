@@ -8,6 +8,7 @@ import { useSession, signOut } from "next-auth/react";
 import AuthModal from "@/components/AuthModal";
 import ChangePasswordModal from "@/components/ChangePasswordModal";
 import SavedRecordsSection from "@/components/SavedRecordsSection";
+import { recordDailyVisit } from "@/app/actions";
 
 
 // --- Types ---
@@ -211,6 +212,40 @@ export default function HomePage() {
     const fn = (session.user as any).firstName || session.user.name?.split(' ')[0] || session.user.email?.split('@')[0];
     return fn || 'Member';
   }, [session]);
+
+  const isSuperAdmin = useMemo(() => {
+    if (!session?.user) return false;
+    return (
+      session.user.email?.trim().toLowerCase() === 'vitastahub@gmail.com' ||
+      (session.user as any).role === 'ADMIN'
+    );
+  }, [session]);
+
+  // Track daily footfall once per day per browser/user (zero wasted DB calls)
+  useEffect(() => {
+    const todayIst = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+
+    try {
+      if (session?.user?.email) {
+        const userKey = `vitasta_uvisit_${session.user.email.toLowerCase()}`;
+        if (localStorage.getItem(userKey) !== todayIst) {
+          localStorage.setItem(userKey, todayIst);
+          recordDailyVisit('user').catch(() => {});
+        }
+      } else {
+        const guestKey = 'vitasta_gvisit_date';
+        if (localStorage.getItem(guestKey) !== todayIst) {
+          localStorage.setItem(guestKey, todayIst);
+          recordDailyVisit('guest').catch(() => {});
+        }
+      }
+    } catch {}
+  }, [session?.user?.email]);
 
   const [isLocal, setIsLocal] = useState(false);
 
@@ -442,6 +477,16 @@ export default function HomePage() {
                         <p className="text-xs font-bold text-stone-800 truncate">{session.user.name}</p>
                         <p className="text-[10px] text-stone-400 truncate">{session.user.email}</p>
                       </div>
+                      {isSuperAdmin && (
+                        <Link
+                          href="/admin"
+                          onClick={() => setUserDropdownOpen(false)}
+                          className="w-full text-left px-4 py-2.5 text-xs font-bold text-[#6d3029] bg-amber-50/70 hover:bg-amber-100/80 flex items-center gap-2.5 transition-colors border-b border-amber-100"
+                        >
+                          <ShieldCheck className="w-3.5 h-3.5 text-amber-700" />
+                          Admin Console
+                        </Link>
+                      )}
                       <button
                         onClick={() => { setUserDropdownOpen(false); scrollToSavedSection(); }}
                         className="w-full text-left px-4 py-2.5 text-xs font-semibold text-stone-700 hover:bg-amber-50 hover:text-[#6d3029] flex items-center gap-2.5 transition-colors"
@@ -568,7 +613,17 @@ export default function HomePage() {
                       Sign Out
                     </button>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className={`grid ${isSuperAdmin ? 'grid-cols-3' : 'grid-cols-2'} gap-2`}>
+                    {isSuperAdmin && (
+                      <Link
+                        href="/admin"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="py-1.5 px-2 rounded-lg bg-amber-400 text-stone-950 text-[11px] font-bold flex items-center justify-center gap-1"
+                      >
+                        <ShieldCheck className="w-3 h-3" />
+                        Admin
+                      </Link>
+                    )}
                     <button
                       onClick={() => { setMobileMenuOpen(false); scrollToSavedSection(); }}
                       className="py-1.5 px-2.5 rounded-lg bg-amber-500/20 border border-amber-400/30 text-amber-300 text-[11px] font-bold flex items-center justify-center gap-1.5"
@@ -581,7 +636,7 @@ export default function HomePage() {
                       className="py-1.5 px-2.5 rounded-lg bg-white/10 text-white/90 text-[11px] font-semibold flex items-center justify-center gap-1.5"
                     >
                       <Lock className="w-3 h-3" />
-                      Change Password
+                      Password
                     </button>
                   </div>
                 </div>
@@ -663,6 +718,16 @@ export default function HomePage() {
                           <p className="text-xs font-bold text-stone-800 truncate">{session.user.name}</p>
                           <p className="text-[10px] text-stone-400 truncate">{session.user.email}</p>
                         </div>
+                        {isSuperAdmin && (
+                          <Link
+                            href="/admin"
+                            onClick={() => setUserDropdownOpen(false)}
+                            className="w-full text-left px-4 py-2.5 text-xs font-bold text-[#6d3029] bg-amber-50/70 hover:bg-amber-100/80 flex items-center gap-2.5 transition-colors border-b border-amber-100"
+                          >
+                            <ShieldCheck className="w-3.5 h-3.5 text-amber-700" />
+                            Admin Console
+                          </Link>
+                        )}
                         <button
                           onClick={() => { setUserDropdownOpen(false); scrollToSavedSection(); }}
                           className="w-full text-left px-4 py-2.5 text-xs font-semibold text-stone-700 hover:bg-amber-50 hover:text-[#6d3029] flex items-center gap-2.5 transition-colors"

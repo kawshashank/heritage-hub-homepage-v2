@@ -4,7 +4,12 @@ import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { getServerSession } from "next-auth/next";
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/lib/prisma";
+import {
+  prisma,
+  SUPER_ADMIN_EMAIL,
+  ensureTrackingSchema,
+  getIstDateStr,
+} from "@/lib/prisma";
 import { sendEmailOTP, sendPasswordResetOTP } from "@/lib/email";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
@@ -505,5 +510,187 @@ export async function deleteShraadRecord(id: string) {
   } catch (err: any) {
     console.error("deleteShraadRecord error:", err);
     return { error: "Failed to delete record." };
+  }
+}
+
+// --- Footfall & Super Admin Actions ---
+
+export async function recordDailyVisit(mode: "guest" | "user") {
+  try {
+    await ensureTrackingSchema();
+    const todayIst = getIstDateStr();
+
+    if (mode === "user") {
+      const userId = await getAuthenticatedUserId();
+      if (!userId) return { ok: false };
+
+      await prisma.$transaction([
+        prisma.$executeRaw`UPDATE "User" SET "lastVisitedAt" = NOW() WHERE "id" = ${userId}`,
+        prisma.$executeRaw`
+          INSERT INTO "DailyStat" ("date", "registeredVisits", "guestVisits", "updatedAt")
+          VALUES (${todayIst}, 1, 0, NOW())
+          ON CONFLICT ("date") DO UPDATE
+          SET "registeredVisits" = "DailyStat"."registeredVisits" + 1,
+              "updatedAt" = NOW()
+        `,
+      ]);
+      return { ok: true };
+    } else {
+      await prisma.$executeRaw`
+        INSERT INTO "DailyStat" ("date", "registeredVisits", "guestVisits", "updatedAt")
+        VALUES (${todayIst}, 0, 1, NOW())
+        ON CONFLICT ("date") DO UPDATE
+        SET "guestVisits" = "DailyStat"."guestVisits" + 1,
+            "updatedAt" = NOW()
+      `;
+      return { ok: true };
+    }
+  } catch {
+    return { ok: false };
+  }
+}
+
+async function assertSuperAdmin() {
+  const session = await getServerSession(authOptions);
+  if ((session as any)?.invalidated || !session?.user) return null;
+  const email = session.user.email?.trim().toLowerCase();
+  const role = (session.user as any).role;
+  if (email === SUPER_ADMIN_EMAIL || role === "ADMIN") {
+    return session.user;
+  }
+  return null;
+}
+
+export async function getAdminDashboardData() {
+  try {
+    const admin = await assertSuperAdmin();
+    if (!admin) {
+      return { error: "Unauthorized. Super Admin access required." };
+    }
+
+    await ensureTrackingSchema();
+
+    const [rawUsers, rawDailyStats] = await Promise.all([
+      prisma.$queryRaw<
+        Array<{
+          id: string;
+          firstName: string | null;
+          lastName: string | null;
+          name: string | null;
+          email: string | null;
+          role: string | null;
+          emailVerified: Date | null;
+          createdAt: Date;
+          lastVisitedAt: Date | null;
+          vohorvodCount: bigint | number;
+          shraadCount: bigint | number;
+        }>
+      >`
+        SELECT
+          u."id",
+          u."firstName",
+          u."lastName",
+          u."name",
+          u."email",
+          u."role",
+          u."emailVerified",
+          u."createdAt",
+          u."lastVisitedAt",
+          (SELECT COUNT(*) FROM "SavedVohorvod" v WHERE v."userId" = u."id") AS "vohorvodCount",
+          (SELECT COUNT(*) FROM "SavedShraad" s WHERE s."userId" = u."id") AS "shraadCount"
+        FROM "User" u
+        ORDER BY u."createdAt" DESC
+      `,
+      prisma.$queryRaw<
+        Array<{
+          date: string;
+          registeredVisits: number;
+          guestVisits: number;
+        }>
+      >`
+        SELECT "date", "registeredVisits", "guestVisits"
+        FROM "DailyStat"
+        ORDER BY "date" ASC
+      `,
+    ]);
+
+    const users = rawUsers.map((u) => {
+      const fallbackParts = (u.name || "").trim().split(/\s+/);
+      return {
+        id: u.id,
+        firstName: u.firstName || fallbackParts[0] || "—",
+        lastName:
+          u.lastName ||
+          (fallbackParts.length > 1 ? fallbackParts.slice(1).join(" ") : "—"),
+        email: u.email || "—",
+        role:
+          u.email?.toLowerCase() === SUPER_ADMIN_EMAIL
+            ? "ADMIN"
+            : u.role || "USER",
+        emailVerified: u.emailVerified ? u.emailVerified.toISOString() : null,
+        createdAt: u.createdAt ? new Date(u.createdAt).toISOString() : null,
+        lastVisitedAt: u.lastVisitedAt
+          ? new Date(u.lastVisitedAt).toISOString()
+          : null,
+        vohorvodCount: Number(u.vohorvodCount || 0),
+        shraadCount: Number(u.shraadCount || 0),
+      };
+    });
+
+    const dailyStats = rawDailyStats.map((d) => ({
+      date: d.date,
+      registeredVisits: Number(d.registeredVisits || 0),
+      guestVisits: Number(d.guestVisits || 0),
+    }));
+
+    return {
+      users,
+      dailyStats,
+    };
+  } catch (err: any) {
+    console.error("getAdminDashboardData error:", err);
+    return { error: err.message || "Failed to load admin data." };
+  }
+}
+
+export async function adminVerifyUserEmail(targetUserId: string) {
+  try {
+    const admin = await assertSuperAdmin();
+    if (!admin) return { error: "Unauthorized." };
+
+    await prisma.user.update({
+      where: { id: targetUserId },
+      data: { emailVerified: new Date() },
+    });
+
+    return { success: true };
+  } catch (err: any) {
+    console.error("adminVerifyUserEmail error:", err);
+    return { error: err.message || "Failed to verify user." };
+  }
+}
+
+export async function adminDeleteUser(targetUserId: string) {
+  try {
+    const admin = await assertSuperAdmin();
+    if (!admin) return { error: "Unauthorized." };
+
+    const target = await prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { email: true },
+    });
+    if (!target) return { error: "User not found." };
+    if (target.email?.toLowerCase() === SUPER_ADMIN_EMAIL) {
+      return { error: "Cannot delete the Super Admin account." };
+    }
+
+    await prisma.user.delete({
+      where: { id: targetUserId },
+    });
+
+    return { success: true };
+  } catch (err: any) {
+    console.error("adminDeleteUser error:", err);
+    return { error: err.message || "Failed to delete user." };
   }
 }

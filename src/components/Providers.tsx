@@ -66,6 +66,7 @@ function SessionInactivityGuard() {
     } catch {}
 
     let lastRecorded = now;
+    let lastSessionVerify = now;
 
     const verifySingleSessionOnServer = () => {
       fetch("/api/hub-session", { credentials: "include" })
@@ -89,12 +90,18 @@ function SessionInactivityGuard() {
         }
       } catch {}
 
-      // Throttle writes to every 10 seconds
+      // Throttle localStorage writes to every 10 seconds
       if (current - lastRecorded > 10_000) {
         lastRecorded = current;
         try {
           localStorage.setItem(ACTIVITY_STORAGE_KEY, String(current));
         } catch {}
+      }
+
+      // Only check single-session on the server when the user is actively interacting (at most once every 30s)
+      if (current - lastSessionVerify > 30_000) {
+        lastSessionVerify = current;
+        verifySingleSessionOnServer();
       }
 
       // Slide server JWT expiration window forward if actively used after 5 mins
@@ -104,7 +111,8 @@ function SessionInactivityGuard() {
       }
     };
 
-    const checkInactivityAndSession = () => {
+    // Pure client-side idle check (0 DB calls when user is inactive so Neon can auto-suspend)
+    const checkInactivityOnly = () => {
       const current = Date.now();
       try {
         const stored = localStorage.getItem(ACTIVITY_STORAGE_KEY);
@@ -114,14 +122,13 @@ function SessionInactivityGuard() {
           return;
         }
       } catch {}
-      if (document.visibilityState === "visible") {
-        verifySingleSessionOnServer();
-      }
     };
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        checkInactivityAndSession();
+        checkInactivityOnly();
+        lastSessionVerify = Date.now();
+        verifySingleSessionOnServer();
       }
     };
 
@@ -130,7 +137,7 @@ function SessionInactivityGuard() {
       window.addEventListener(evt, handleUserActivity, { passive: true })
     );
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    const intervalId = window.setInterval(checkInactivityAndSession, 20_000);
+    const intervalId = window.setInterval(checkInactivityOnly, 20_000);
 
     return () => {
       events.forEach((evt) =>

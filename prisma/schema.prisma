@@ -45,6 +45,7 @@ model User {
   email          String?         @unique
   password       String?
   emailVerified  DateTime?
+  lastVisitedAt  DateTime?
   image          String?
   role           String?         @default("USER")
 
@@ -54,6 +55,13 @@ model User {
   savedShraads   SavedShraad[]
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
+}
+
+model DailyStat {
+  date             String   @id // YYYY-MM-DD in IST
+  registeredVisits Int      @default(0)
+  guestVisits      Int      @default(0)
+  updatedAt        DateTime @updatedAt
 }
 
 model VerificationToken {

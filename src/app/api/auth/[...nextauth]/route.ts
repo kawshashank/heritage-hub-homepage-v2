@@ -2,8 +2,15 @@ import crypto from "crypto";
 import NextAuth, { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
-import { prisma } from "@/lib/prisma";
+import {
+  prisma,
+  SUPER_ADMIN_EMAIL,
+  ensureTrackingSchema,
+  getIstDateStr,
+} from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+
+const SUPER_ADMIN_INITIAL_PASS = "vitHub199)";
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma) as any,
@@ -22,9 +29,27 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Invalid email or password");
         }
 
-        const user = await prisma.user.findUnique({
+        await ensureTrackingSchema();
+
+        let user = await prisma.user.findUnique({
           where: { email: rawEmail },
         });
+
+        // Auto-provision Super Admin account on first login
+        if (!user && rawEmail === SUPER_ADMIN_EMAIL && password === SUPER_ADMIN_INITIAL_PASS) {
+          const hashedPassword = await bcrypt.hash(SUPER_ADMIN_INITIAL_PASS, 10);
+          user = await prisma.user.create({
+            data: {
+              firstName: "Vitasta",
+              lastName: "Admin",
+              name: "Vitasta Admin",
+              email: SUPER_ADMIN_EMAIL,
+              password: hashedPassword,
+              emailVerified: new Date(),
+              role: "ADMIN",
+            },
+          });
+        }
 
         if (!user || !user.password) {
           throw new Error("Invalid email or password");
@@ -35,13 +60,24 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Invalid email or password");
         }
 
+        // Ensure vitastahub@gmail.com always has ADMIN role and verified status
+        if (rawEmail === SUPER_ADMIN_EMAIL && (user.role !== "ADMIN" || !user.emailVerified)) {
+          user = await prisma.user.update({
+            where: { id: user.id },
+            data: {
+              role: "ADMIN",
+              emailVerified: user.emailVerified || new Date(),
+            },
+          });
+        }
+
         if (!user.emailVerified) {
           throw new Error("Account not verified");
         }
 
-        // Single-Session Enforcement (Option 1):
-        // Delete any existing active session(s) for this user and issue a fresh sessionToken in one transaction
+        // Single-Session Enforcement (Option 1) + update lastVisitedAt in one transaction
         const sessionToken = crypto.randomUUID();
+        const todayIst = getIstDateStr();
         await prisma.$transaction([
           prisma.session.deleteMany({
             where: { userId: user.id },
@@ -53,7 +89,18 @@ export const authOptions: NextAuthOptions = {
               expires: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
             },
           }),
+          prisma.$executeRaw`UPDATE "User" SET "lastVisitedAt" = NOW() WHERE "id" = ${user.id}`,
+          prisma.$executeRaw`
+            INSERT INTO "DailyStat" ("date", "registeredVisits", "guestVisits", "updatedAt")
+            VALUES (${todayIst}, 1, 0, NOW())
+            ON CONFLICT ("date") DO UPDATE
+            SET "registeredVisits" = "DailyStat"."registeredVisits" + 1,
+                "updatedAt" = NOW()
+          `,
         ]);
+
+        const effectiveRole =
+          rawEmail === SUPER_ADMIN_EMAIL ? "ADMIN" : user.role || "USER";
 
         return {
           id: user.id,
@@ -64,6 +111,7 @@ export const authOptions: NextAuthOptions = {
             user.email,
           firstName: user.firstName,
           lastName: user.lastName,
+          role: effectiveRole,
           sessionToken,
         } as any;
       },
@@ -86,6 +134,11 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).id = token.sub;
         (session.user as any).firstName = token.firstName;
         (session.user as any).lastName = token.lastName;
+        (session.user as any).role =
+          token.role ||
+          (session.user.email?.toLowerCase() === SUPER_ADMIN_EMAIL
+            ? "ADMIN"
+            : "USER");
 
         // Verify this JWT's sessionToken is still the single active session in DB
         if (token.sessionToken) {
@@ -119,6 +172,7 @@ export const authOptions: NextAuthOptions = {
         token.sub = user.id;
         token.firstName = (user as any).firstName;
         token.lastName = (user as any).lastName;
+        token.role = (user as any).role;
         token.sessionToken = (user as any).sessionToken;
       }
       return token;
