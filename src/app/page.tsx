@@ -182,7 +182,7 @@ const HERITAGE_THOUGHTS = [
 ];
 
 export default function HomePage() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const [activeSlide, setActiveSlide] = useState(0);
   const [thoughtIndex, setThoughtIndex] = useState(0);
 
@@ -223,6 +223,8 @@ export default function HomePage() {
 
   // Track daily footfall once per day per browser/user (zero wasted DB calls)
   useEffect(() => {
+    if (status === 'loading') return;
+
     const todayIst = new Intl.DateTimeFormat('en-CA', {
       timeZone: 'Asia/Kolkata',
       year: 'numeric',
@@ -231,21 +233,39 @@ export default function HomePage() {
     }).format(new Date());
 
     try {
-      if (session?.user?.email) {
-        const userKey = `vitasta_uvisit_${session.user.email.toLowerCase()}`;
-        if (localStorage.getItem(userKey) !== todayIst) {
-          localStorage.setItem(userKey, todayIst);
-          recordDailyVisit('user').catch(() => {});
+      const guestKey = 'vitasta_gvisit_date';
+      const convertedKey = 'vitasta_gvisit_converted';
+      const adminDeviceKey = 'vitasta_is_admin_device';
+
+      if (status === 'authenticated' && session?.user?.email) {
+        const emailLower = session.user.email.trim().toLowerCase();
+        if (isSuperAdmin) {
+          localStorage.setItem(adminDeviceKey, 'true');
         }
-      } else {
-        const guestKey = 'vitasta_gvisit_date';
+
+        const userKey = `vitasta_uvisit_${emailLower}`;
+        const hadGuestVisitToday =
+          localStorage.getItem(guestKey) === todayIst &&
+          localStorage.getItem(convertedKey) !== todayIst;
+
+        if (localStorage.getItem(userKey) !== todayIst || hadGuestVisitToday) {
+          localStorage.setItem(userKey, todayIst);
+          if (hadGuestVisitToday) {
+            localStorage.setItem(convertedKey, todayIst);
+          }
+          recordDailyVisit('user', hadGuestVisitToday).catch(() => {});
+        }
+      } else if (status === 'unauthenticated') {
+        // Do not count the Super Admin's own browser as a guest when signed out
+        if (localStorage.getItem(adminDeviceKey) === 'true') return;
+
         if (localStorage.getItem(guestKey) !== todayIst) {
           localStorage.setItem(guestKey, todayIst);
           recordDailyVisit('guest').catch(() => {});
         }
       }
     } catch {}
-  }, [session?.user?.email]);
+  }, [status, session?.user?.email, isSuperAdmin]);
 
   const [isLocal, setIsLocal] = useState(false);
 

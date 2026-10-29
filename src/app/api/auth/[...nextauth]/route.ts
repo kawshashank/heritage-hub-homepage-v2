@@ -77,7 +77,6 @@ export const authOptions: NextAuthOptions = {
 
         // Single-Session Enforcement (Option 1) + update lastVisitedAt in one transaction
         const sessionToken = crypto.randomUUID();
-        const todayIst = getIstDateStr();
         await prisma.$transaction([
           prisma.session.deleteMany({
             where: { userId: user.id },
@@ -90,13 +89,6 @@ export const authOptions: NextAuthOptions = {
             },
           }),
           prisma.$executeRaw`UPDATE "User" SET "lastVisitedAt" = NOW() WHERE "id" = ${user.id}`,
-          prisma.$executeRaw`
-            INSERT INTO "DailyStat" ("date", "registeredVisits", "guestVisits", "updatedAt")
-            VALUES (${todayIst}, 1, 0, NOW())
-            ON CONFLICT ("date") DO UPDATE
-            SET "registeredVisits" = "DailyStat"."registeredVisits" + 1,
-                "updatedAt" = NOW()
-          `,
         ]);
 
         const effectiveRole =

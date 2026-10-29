@@ -224,8 +224,13 @@ export default function AdminDashboardPage() {
   const summary = useMemo(() => {
     const now = Date.now();
     const dayMs = 24 * 60 * 60 * 1000;
-    const totalUsers = users.length;
-    const verifiedUsers = users.filter((u) => Boolean(u.emailVerified)).length;
+    const nonAdminUsers = users.filter(
+      (u) => u.email.toLowerCase() !== SUPER_ADMIN_EMAIL && u.role !== "ADMIN"
+    );
+    const totalUsers = nonAdminUsers.length;
+    const verifiedUsers = nonAdminUsers.filter((u) =>
+      Boolean(u.emailVerified)
+    ).length;
     const unverifiedUsers = totalUsers - verifiedUsers;
     const totalVohorvods = users.reduce((acc, u) => acc + u.vohorvodCount, 0);
     const totalShraads = users.reduce((acc, u) => acc + u.shraadCount, 0);
@@ -236,9 +241,13 @@ export default function AdminDashboardPage() {
       return now - new Date(refIso).getTime() <= days * dayMs;
     };
 
-    const active7d = users.filter((u) => isVisitedWithin(u, 7)).length;
-    const active30d = users.filter((u) => isVisitedWithin(u, 30)).length;
-    const active90d = users.filter((u) => isVisitedWithin(u, 90)).length;
+    const active7d = nonAdminUsers.filter((u) => isVisitedWithin(u, 7)).length;
+    const active30d = nonAdminUsers.filter((u) =>
+      isVisitedWithin(u, 30)
+    ).length;
+    const active90d = nonAdminUsers.filter((u) =>
+      isVisitedWithin(u, 90)
+    ).length;
 
     return {
       totalUsers,
@@ -299,7 +308,11 @@ export default function AdminDashboardPage() {
     const signupsByDate = new Map<string, number>();
     const activeUsersByDate = new Map<string, number>();
 
-    users.forEach((u) => {
+    const nonAdminUsers = users.filter(
+      (u) => u.email.toLowerCase() !== SUPER_ADMIN_EMAIL && u.role !== "ADMIN"
+    );
+
+    nonAdminUsers.forEach((u) => {
       if (u.createdAt) {
         const cKey = getIstYmd(new Date(u.createdAt));
         signupsByDate.set(cKey, (signupsByDate.get(cKey) || 0) + 1);
@@ -328,7 +341,7 @@ export default function AdminDashboardPage() {
       const signups = signupsByDate.get(ymd) || 0;
       const lastVisitCount = activeUsersByDate.get(ymd) || 0;
 
-      // Ensure registeredVisits is at least the number of users whose lastVisitedAt or signup is on that day
+      // Ensure registeredVisits is at least the number of non-admin users whose lastVisitedAt or signup is on that day
       const regVisits = Math.max(
         stat?.registeredVisits || 0,
         lastVisitCount,
@@ -399,7 +412,7 @@ export default function AdminDashboardPage() {
     const totalSignupsInWindow = days.reduce((a, b) => a + b.newSignups, 0);
 
     const cutoffMs = Date.now() - footfallRange * 24 * 60 * 60 * 1000;
-    const visitingUsersInWindow = users.filter((u) => {
+    const visitingUsersInWindow = nonAdminUsers.filter((u) => {
       const refIso = u.lastVisitedAt || u.createdAt;
       if (!refIso) return false;
       return new Date(refIso).getTime() >= cutoffMs;
@@ -1422,41 +1435,58 @@ export default function AdminDashboardPage() {
                                 </>
                               )}
 
-                              {/* Value Badge directly above peak/active point */}
-                              {(isHovered ||
-                                (footfallRange !== 30 &&
-                                  bar.totalVisits > 0)) && (
-                                <text
-                                  x={cx}
-                                  y={
-                                    Math.min(
-                                      showRegistered
-                                        ? regPoints[idx].y
-                                        : baselineY,
-                                      showGuest
-                                        ? guestPoints[idx].y
-                                        : baselineY,
-                                      showSignups
-                                        ? signupPoints[idx].y
-                                        : baselineY
-                                    ) - 10
-                                  }
-                                  textAnchor="middle"
-                                  className={`text-[10px] font-bold ${
-                                    isHovered
-                                      ? "fill-[#6d3029]"
-                                      : "fill-stone-500"
-                                  }`}
-                                >
-                                  {chartMetric === "registered"
-                                    ? bar.registeredVisits
-                                    : chartMetric === "guest"
-                                      ? bar.guestVisits
-                                      : chartMetric === "signups"
-                                        ? bar.newSignups
-                                        : bar.totalVisits}
-                                </text>
-                              )}
+                              {/* Individual Curve Value Badges (never summed across curves) */}
+                              {showRegistered &&
+                                (bar.registeredVisits > 0 ||
+                                  (isHovered &&
+                                    chartMetric === "registered")) &&
+                                (isHovered || footfallRange !== 30) && (
+                                  <text
+                                    x={
+                                      showGuest &&
+                                      bar.guestVisits === bar.registeredVisits
+                                        ? cx - 8
+                                        : cx
+                                    }
+                                    y={regPoints[idx].y - 10}
+                                    textAnchor="middle"
+                                    className="text-[10px] font-bold fill-[#6d3029]"
+                                  >
+                                    {bar.registeredVisits}
+                                  </text>
+                                )}
+
+                              {showGuest &&
+                                (bar.guestVisits > 0 ||
+                                  (isHovered && chartMetric === "guest")) &&
+                                (isHovered || footfallRange !== 30) && (
+                                  <text
+                                    x={
+                                      showRegistered &&
+                                      bar.guestVisits === bar.registeredVisits
+                                        ? cx + 8
+                                        : cx
+                                    }
+                                    y={guestPoints[idx].y - 10}
+                                    textAnchor="middle"
+                                    className="text-[10px] font-bold fill-indigo-600"
+                                  >
+                                    {bar.guestVisits}
+                                  </text>
+                                )}
+
+                              {chartMetric === "signups" &&
+                                (bar.newSignups > 0 || isHovered) &&
+                                (isHovered || footfallRange !== 30) && (
+                                  <text
+                                    x={cx}
+                                    y={signupPoints[idx].y - 10}
+                                    textAnchor="middle"
+                                    className="text-[10px] font-bold fill-emerald-700"
+                                  >
+                                    {bar.newSignups}
+                                  </text>
+                                )}
 
                               {/* X-Axis Label */}
                               {showXLabel && (

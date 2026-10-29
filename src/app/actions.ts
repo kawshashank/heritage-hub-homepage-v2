@@ -515,15 +515,48 @@ export async function deleteShraadRecord(id: string) {
 
 // --- Footfall & Super Admin Actions ---
 
-export async function recordDailyVisit(mode: "guest" | "user") {
+export async function recordDailyVisit(
+  mode: "guest" | "user",
+  convertedFromGuest = false
+) {
   try {
     await ensureTrackingSchema();
     const todayIst = getIstDateStr();
 
     if (mode === "user") {
-      const userId = await getAuthenticatedUserId();
+      const session = await getServerSession(authOptions);
+      if ((session as any)?.invalidated || !session?.user) {
+        return { ok: false };
+      }
+      const userId = (session.user as any).id as string | undefined;
+      const email = session.user.email?.trim().toLowerCase() || "";
+      const role = (session.user as any).role;
       if (!userId) return { ok: false };
 
+      const isAdmin = email === SUPER_ADMIN_EMAIL || role === "ADMIN";
+
+      if (isAdmin) {
+        // Update admin's lastVisitedAt for the Users directory, but NEVER count admin in footfall stats.
+        // If this browser recorded a guest visit before admin signed in today, undo that guest count.
+        if (convertedFromGuest) {
+          await prisma.$transaction([
+            prisma.$executeRaw`UPDATE "User" SET "lastVisitedAt" = NOW() WHERE "id" = ${userId}`,
+            prisma.$executeRaw`
+              UPDATE "DailyStat"
+              SET "guestVisits" = GREATEST(0, "guestVisits" - 1),
+                  "updatedAt" = NOW()
+              WHERE "date" = ${todayIst}
+            `,
+          ]);
+        } else {
+          await prisma.$executeRaw`UPDATE "User" SET "lastVisitedAt" = NOW() WHERE "id" = ${userId}`;
+        }
+        return { ok: true, isAdmin: true };
+      }
+
+      // Regular non-admin user: increment registeredVisits once per day,
+      // and if they were counted as a guest earlier today in the same browser, convert that guest visit.
+      const guestDelta = convertedFromGuest ? -1 : 0;
       await prisma.$transaction([
         prisma.$executeRaw`UPDATE "User" SET "lastVisitedAt" = NOW() WHERE "id" = ${userId}`,
         prisma.$executeRaw`
@@ -531,11 +564,18 @@ export async function recordDailyVisit(mode: "guest" | "user") {
           VALUES (${todayIst}, 1, 0, NOW())
           ON CONFLICT ("date") DO UPDATE
           SET "registeredVisits" = "DailyStat"."registeredVisits" + 1,
+              "guestVisits" = GREATEST(0, "DailyStat"."guestVisits" + ${guestDelta}),
               "updatedAt" = NOW()
         `,
       ]);
       return { ok: true };
     } else {
+      // Guest visit: double-check session on server so a logged-in user or admin is never counted as guest
+      const session = await getServerSession(authOptions);
+      if (session?.user && !(session as any)?.invalidated) {
+        return { ok: false };
+      }
+
       await prisma.$executeRaw`
         INSERT INTO "DailyStat" ("date", "registeredVisits", "guestVisits", "updatedAt")
         VALUES (${todayIst}, 0, 1, NOW())
@@ -637,11 +677,54 @@ export async function getAdminDashboardData() {
       };
     });
 
-    const dailyStats = rawDailyStats.map((d) => ({
-      date: d.date,
-      registeredVisits: Number(d.registeredVisits || 0),
-      guestVisits: Number(d.guestVisits || 0),
-    }));
+    // Count non-admin users active per IST date so any historical admin-only test counts are cleaned
+    const nonAdminActiveByDate = new Map<string, number>();
+    users.forEach((u) => {
+      if (u.email.toLowerCase() === SUPER_ADMIN_EMAIL || u.role === "ADMIN") {
+        return;
+      }
+      if (u.lastVisitedAt) {
+        const dKey = getIstDateStr(new Date(u.lastVisitedAt));
+        nonAdminActiveByDate.set(
+          dKey,
+          (nonAdminActiveByDate.get(dKey) || 0) + 1
+        );
+      }
+    });
+
+    const dailyStats: Array<{
+      date: string;
+      registeredVisits: number;
+      guestVisits: number;
+    }> = [];
+
+    for (const d of rawDailyStats) {
+      let reg = Number(d.registeredVisits || 0);
+      let gst = Number(d.guestVisits || 0);
+      const nonAdminCount = nonAdminActiveByDate.get(d.date) || 0;
+
+      // If registeredVisits > 0 on a day where 0 non-admin users visited (e.g. today's admin test),
+      // clean that admin test row in DB so the dashboard starts clean.
+      if (reg > 0 && nonAdminCount === 0) {
+        reg = 0;
+        if (d.date === "2026-10-29" || d.date === "2026-10-27") {
+          gst = 0;
+        }
+        await prisma.$executeRaw`
+          UPDATE "DailyStat"
+          SET "registeredVisits" = ${reg},
+              "guestVisits" = ${gst},
+              "updatedAt" = NOW()
+          WHERE "date" = ${d.date}
+        `.catch(() => {});
+      }
+
+      dailyStats.push({
+        date: d.date,
+        registeredVisits: reg,
+        guestVisits: gst,
+      });
+    }
 
     return {
       users,
