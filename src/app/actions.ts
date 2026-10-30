@@ -677,54 +677,11 @@ export async function getAdminDashboardData() {
       };
     });
 
-    // Count non-admin users active per IST date so any historical admin-only test counts are cleaned
-    const nonAdminActiveByDate = new Map<string, number>();
-    users.forEach((u) => {
-      if (u.email.toLowerCase() === SUPER_ADMIN_EMAIL || u.role === "ADMIN") {
-        return;
-      }
-      if (u.lastVisitedAt) {
-        const dKey = getIstDateStr(new Date(u.lastVisitedAt));
-        nonAdminActiveByDate.set(
-          dKey,
-          (nonAdminActiveByDate.get(dKey) || 0) + 1
-        );
-      }
-    });
-
-    const dailyStats: Array<{
-      date: string;
-      registeredVisits: number;
-      guestVisits: number;
-    }> = [];
-
-    for (const d of rawDailyStats) {
-      let reg = Number(d.registeredVisits || 0);
-      let gst = Number(d.guestVisits || 0);
-      const nonAdminCount = nonAdminActiveByDate.get(d.date) || 0;
-
-      // If registeredVisits > 0 on a day where 0 non-admin users visited (e.g. today's admin test),
-      // clean that admin test row in DB so the dashboard starts clean.
-      if (reg > 0 && nonAdminCount === 0) {
-        reg = 0;
-        if (d.date === "2026-10-29" || d.date === "2026-10-27") {
-          gst = 0;
-        }
-        await prisma.$executeRaw`
-          UPDATE "DailyStat"
-          SET "registeredVisits" = ${reg},
-              "guestVisits" = ${gst},
-              "updatedAt" = NOW()
-          WHERE "date" = ${d.date}
-        `.catch(() => {});
-      }
-
-      dailyStats.push({
-        date: d.date,
-        registeredVisits: reg,
-        guestVisits: gst,
-      });
-    }
+    const dailyStats = rawDailyStats.map((d) => ({
+      date: d.date,
+      registeredVisits: Number(d.registeredVisits || 0),
+      guestVisits: Number(d.guestVisits || 0),
+    }));
 
     return {
       users,
